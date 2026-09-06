@@ -73,6 +73,7 @@ import {
   groupRowsByDay,
   flattenDayGroups,
   netSummary,
+  withKnownNetCurrencies,
   type TransactionDayGroup,
   type TransactionRowVM,
 } from "../lib/transactions-helpers";
@@ -577,14 +578,10 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
      * exact — and it sums the same signed figure the server nets, so the two
      * readouts cannot disagree.
      */
-    const selectedNet = useMemo(
-      () =>
-        netSummary(
-          rows.filter((r) => selectedRowIds.has(r.activity.id)),
-          baseCurrency,
-        ),
-      [rows, selectedRowIds, baseCurrency],
-    );
+    const selectedNet = useMemo(() => {
+      const selectedRows = rows.filter((r) => selectedRowIds.has(r.activity.id));
+      return withKnownNetCurrencies(netSummary(selectedRows, baseCurrency), selectedRows);
+    }, [rows, selectedRowIds, baseCurrency]);
     const bulkCategoryScope = useMemo<QuickCategorizeScope | null>(() => {
       if (selectedRowIds.size === 0) return null;
       const buckets = new Set(
@@ -617,7 +614,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
      * Summed server-side over the whole filtered set before pagination, so it
      * describes the filter rather than the rows that happen to be loaded.
      */
-    const filteredNet = filtersActive ? net : null;
+    const filteredNet = filtersActive && net ? withKnownNetCurrencies(net, rows) : null;
 
     const clearAllFilters = useCallback(() => {
       setSearchInput("");

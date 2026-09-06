@@ -100,6 +100,66 @@ describe("TransactionsFilterBar net readouts", () => {
     expect(screen.getByText("0")).toBeVisible();
   });
 
+  it.each([false, true])(
+    "uses the same styled native pill for zero and nonzero amounts (mobile=%s)",
+    (isMobile) => {
+      renderBar(
+        {
+          selectedNet: net([
+            { currency: "CAD", amount: 40.25 },
+            { currency: "EUR", amount: 0 },
+          ]),
+        },
+        { isMobile },
+      );
+
+      const nonzeroPill = screen.getByText("CAD").parentElement;
+      const zeroPill = screen.getByText("EUR").parentElement;
+      expect(zeroPill).toHaveClass("bg-muted/45", "rounded-full", "inline-flex", "px-2", "py-0.5");
+      expect(zeroPill?.className).toBe(nonzeroPill?.className);
+      expect(zeroPill).toHaveTextContent("EUR+0.00");
+      expect(nonzeroPill).toHaveTextContent("CAD+40.25");
+    },
+  );
+
+  it("retains individual native zero pills beside the unchanged converted headline", () => {
+    renderBar({
+      selectedNet: net(
+        [
+          { currency: "CAD", amount: 0 },
+          { currency: "EUR", amount: 0 },
+        ],
+        { currency: "USD", amount: 0 },
+      ),
+    });
+
+    expect(screen.getByText("$0.00")).toBeVisible();
+    for (const currency of ["CAD", "EUR"]) {
+      const pill = screen.getByText(currency).parentElement;
+      expect(pill).toHaveClass("bg-muted/45", "rounded-full");
+      expect(pill).toHaveTextContent(`${currency}+0.00`);
+    }
+  });
+
+  it("styles a known filtered zero currency with the native pill too", () => {
+    renderBar({ filteredNet: net([{ currency: "EUR", amount: 0 }]) });
+
+    expect(screen.getByText("Filtered net")).toBeVisible();
+    expect(screen.getByText("EUR").parentElement).toHaveClass("bg-muted/45", "rounded-full");
+    expect(screen.getByText("EUR").parentElement).toHaveTextContent("EUR+0.00");
+    expect(screen.queryByText("CAD")).not.toBeInTheDocument();
+  });
+
+  it("masks zero amounts while retaining native currency and pill styling", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "true" });
+    renderBar({ selectedNet: net([{ currency: "EUR", amount: 0 }]) });
+
+    const pill = screen.getByText("EUR").parentElement;
+    expect(pill).toHaveClass("bg-muted/45", "rounded-full");
+    expect(pill).toHaveTextContent("EUR+••••");
+    expect(pill).not.toHaveTextContent("0.00");
+  });
+
   it("masks zero readouts without removing their labels", () => {
     vi.stubGlobal("localStorage", { getItem: () => "true" });
     renderBar({ selectedNet: net([]), filteredNet: net([]) });
