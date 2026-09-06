@@ -7,6 +7,7 @@ import {
   getTransferLinkStatus,
   groupRowsByDay,
   netSummary,
+  withKnownNetCurrencies,
   isTransferCashActivity,
   toRowVM,
 } from "./transactions-helpers";
@@ -109,6 +110,79 @@ describe("spending transaction helpers", () => {
 
     expect(row.category).toBeNull();
     expect(row.splitCount).toBe(2);
+  });
+});
+
+describe("withKnownNetCurrencies", () => {
+  function row(currency: string, netAmount: number, netAmountBase?: number) {
+    return toRowVM(cashActivity({ currency, netAmount, netAmountBase }), new Map());
+  }
+
+  it.each(["CAD", "EUR"])(
+    "restores the actual cancelling currency %s, not an assumed base",
+    (currency) => {
+      const rows = [row(currency, -40.25), row(currency, 40.25)];
+      const net = netSummary(rows, "CAD");
+      expect(net.byCurrency).toEqual([]);
+      expect(withKnownNetCurrencies(net, rows)).toEqual({
+        byCurrency: [{ currency, amount: 0 }],
+        converted: null,
+      });
+      expect(net.byCurrency).toEqual([]);
+    },
+  );
+
+  it("retains independently cancelled currencies without manufacturing FX", () => {
+    const rows = [row("CAD", -40.25), row("EUR", 17.5), row("CAD", 40.25), row("EUR", -17.5)];
+    expect(withKnownNetCurrencies(netSummary(rows, "CAD"), rows)).toEqual({
+      byCurrency: [
+        { currency: "CAD", amount: 0 },
+        { currency: "EUR", amount: 0 },
+      ],
+      converted: null,
+    });
+  });
+
+  it("does not change compensated arithmetic or the existing conversion policy", () => {
+    const rows = [
+      row("CAD", 0.1, 0.2),
+      row("CAD", 0.2, 0.4),
+      row("CAD", -0.3, -0.5),
+      row("USD", -10, -10),
+      row("EUR", -20, -40),
+    ];
+    const net = netSummary(rows, "USD");
+    const readout = withKnownNetCurrencies(net, rows);
+    expect(readout.converted).toBe(net.converted);
+    expect(readout.converted).toEqual({ currency: "USD", amount: -50 });
+    expect(readout.byCurrency).toEqual([
+      { currency: "USD", amount: -10 },
+      { currency: "EUR", amount: -20 },
+      { currency: "CAD", amount: 0 },
+    ]);
+  });
+
+  it("preserves server-wide totals when loaded rows only supply zero-currency identities", () => {
+    const fullNet = { byCurrency: [{ currency: "USD", amount: -1234.56 }], converted: null };
+    const loadedRows = [row("USD", -10), row("EUR", 40.25)];
+    // The full filtered EUR bucket cancels on another page and is omitted by the server.
+    expect(withKnownNetCurrencies(fullNet, loadedRows)).toEqual({
+      byCurrency: [
+        { currency: "USD", amount: -1234.56 },
+        { currency: "EUR", amount: 0 },
+      ],
+      converted: null,
+    });
+  });
+
+  it("keeps valid zero-valued rows but does not invent currencies from absent or invalid rows", () => {
+    const empty = { byCurrency: [], converted: null };
+    expect(withKnownNetCurrencies(empty, [])).toEqual(empty);
+    expect(withKnownNetCurrencies(empty, [row("EUR", Number.NaN)])).toEqual(empty);
+    expect(withKnownNetCurrencies(empty, [row("JPY", 0)])).toEqual({
+      byCurrency: [{ currency: "JPY", amount: 0 }],
+      converted: null,
+    });
   });
 });
 

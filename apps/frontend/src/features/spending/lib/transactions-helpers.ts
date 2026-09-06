@@ -266,6 +266,22 @@ export function netSummary(rows: TransactionRowVM[], baseCurrency?: string): Net
 }
 
 /**
+ * NetSummary omits zero currency buckets. Restore currencies observed in this
+ * result set for the readout, without changing its amounts or converted total.
+ * A server-filtered net still covers every page; loaded rows only supply labels.
+ */
+export function withKnownNetCurrencies(net: NetSummary, rows: TransactionRowVM[]): NetSummary {
+  const byCurrency = [...net.byCurrency];
+  const currencies = new Set(byCurrency.map((total) => total.currency));
+  for (const { activity } of rows) {
+    if (!Number.isFinite(activity.netAmount) || currencies.has(activity.currency)) continue;
+    currencies.add(activity.currency);
+    byCurrency.push({ currency: activity.currency, amount: 0 });
+  }
+  return { ...net, byCurrency };
+}
+
+/**
  * Buckets date-sorted rows into day groups, preserving the incoming order.
  * Bucketing uses `timezone` so a late-evening activity lands on the day the
  * user perceives — the same key the header then formats.
