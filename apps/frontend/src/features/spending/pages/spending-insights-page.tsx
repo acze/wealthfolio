@@ -132,7 +132,7 @@ export default function SpendingInsightsPage() {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const appTimezone = settings?.timezone ?? undefined;
-  const { isEnabled, isLoading: settingsLoading } = useSpendingSettings();
+  const { isEnabled, isLoading: settingsLoading, accountIds } = useSpendingSettings();
 
   const [persistedPeriod, setPersistedPeriod] = usePersistentState<string>(
     INSIGHTS_PERIOD_STORAGE_KEY,
@@ -564,6 +564,8 @@ export default function SpendingInsightsPage() {
         rangeStart={categorySheetRange.start}
         rangeEnd={categorySheetRange.end}
         currency={baseCurrency}
+        accountIds={accountIds}
+        timezone={appTimezone}
       />
 
       <HeatmapCellSheet

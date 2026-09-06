@@ -63,6 +63,32 @@ export interface CashActivitySearchRequest {
   sortDir?: CashActivitySortDirection;
   offset?: number;
   limit?: number;
+  /** Read-only analysis. In all mode, ids are exclusions; otherwise inclusions. */
+  selection?: CashActivitySelection;
+}
+
+export interface CashActivitySelection {
+  mode: "all" | "explicit";
+  ids: string[];
+}
+
+/** Decimal strings preserve the server's exact aggregation across the wire. */
+export interface ExactMoneySummary {
+  byCurrency: { currency: string; amount: string }[];
+  converted: { currency: string; amount: string } | null;
+  missingRateCurrencies: string[];
+}
+
+export interface AnalysisTotals {
+  count: number;
+  cashMovement: ExactMoneySummary;
+  spending: ExactMoneySummary;
+}
+
+export interface CashActivityAnalysis {
+  matching: AnalysisTotals;
+  selected: AnalysisTotals;
+  excluded: AnalysisTotals;
 }
 
 /**
@@ -127,4 +153,5 @@ export interface CashActivitySearchResponse {
    * base-currency setting changes.
    */
   baseCurrency?: string | null;
+  analysis?: CashActivityAnalysis | null;
 }

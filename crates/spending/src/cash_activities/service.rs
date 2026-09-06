@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -16,14 +16,17 @@ use wealthfolio_core::utils::time_utils::{activity_date_in_tz, parse_user_timezo
 
 use super::{
     model::{
-        CashActivity, CashActivityFilter, CashActivitySearchRequest, CashActivitySearchResponse,
-        CashActivitySortField, CashActivityStatusFilter, CashFlowBucket, CurrencyNet, NetSummary,
-        SortDirection, TransferLinkStatus,
+        AnalysisTotals, CashActivity, CashActivityAnalysis, CashActivityFilter,
+        CashActivitySearchRequest, CashActivitySearchResponse, CashActivitySelection,
+        CashActivitySelectionMode, CashActivitySortField, CashActivityStatusFilter, CashFlowBucket,
+        CurrencyNet, ExactCurrencyAmount, ExactMoneySummary, NetSummary, SortDirection,
+        TransferLinkStatus,
     },
     CASH_ACTIVITY_TYPES,
 };
 use crate::activity_allocations::{
-    group_assignments as group_assignments_owned, group_splits as group_splits_owned,
+    allocations_for_taxonomy, group_assignments as group_assignments_owned,
+    group_splits as group_splits_owned, AssignmentsByActivity, SplitsByActivity,
 };
 use crate::activity_assignments::{
     ActivityTaxonomyAssignment, ActivityTaxonomyAssignmentService, BulkCategoryAssignment,
@@ -71,6 +74,70 @@ struct TargetAccounts {
     ids: Vec<String>,
     types: HashMap<String, String>,
     currencies: HashMap<String, String>,
+}
+
+#[derive(Default)]
+struct ExactMoneyTally {
+    native: BTreeMap<String, Decimal>,
+    converted: Decimal,
+    missing: BTreeSet<String>,
+}
+
+impl ExactMoneyTally {
+    fn add(&mut self, currency: &str, native: Decimal, converted: Option<Decimal>) {
+        if native.is_zero() {
+            return;
+        }
+        *self.native.entry(currency.to_string()).or_default() += native;
+        match converted {
+            Some(amount) => self.converted += amount,
+            None => {
+                self.missing.insert(currency.to_string());
+            }
+        }
+    }
+
+    fn finish(self, base_currency: Option<&str>) -> ExactMoneySummary {
+        ExactMoneySummary {
+            by_currency: self
+                .native
+                .into_iter()
+                .filter(|(_, amount)| !amount.is_zero())
+                .map(|(currency, amount)| ExactCurrencyAmount {
+                    currency,
+                    amount: amount.normalize().to_string(),
+                })
+                .collect(),
+            converted: base_currency
+                .filter(|_| self.missing.is_empty())
+                .map(|currency| ExactCurrencyAmount {
+                    currency: currency.to_string(),
+                    amount: self.converted.normalize().to_string(),
+                }),
+            missing_rate_currencies: if base_currency.is_some() {
+                self.missing.into_iter().collect()
+            } else {
+                Vec::new()
+            },
+        }
+    }
+}
+
+#[derive(Default)]
+struct AnalysisTally {
+    count: usize,
+    cash_movement: ExactMoneyTally,
+    spending: ExactMoneyTally,
+}
+
+impl AnalysisTally {
+    fn finish(self, base_currency: Option<&str>) -> AnalysisTotals {
+        AnalysisTotals {
+            count: self.count,
+            cash_movement: self.cash_movement.finish(base_currency),
+            spending: self.spending.finish(base_currency),
+        }
+    }
 }
 
 impl CashActivityService {
@@ -324,7 +391,7 @@ impl CashActivityService {
     }
 
     /// Search/filter/paginate cash activities. Powers the spending Transactions page.
-    /// Server-side pipeline: filters → sort → paginate → join assignments for the page slice.
+    /// Server-side pipeline: filters → sort → optional analysis → paginate → join page assignments.
     /// `base_currency` is the currency the converted net is denominated in.
     /// Injected by the app-level callers and never sent by the client; `None`
     /// asks for the per-currency breakdown only.
@@ -342,6 +409,10 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
+                analysis: req
+                    .selection
+                    .as_ref()
+                    .map(|_| CashActivityAnalysis::empty(base_currency)),
             });
         }
 
@@ -356,6 +427,10 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
+                analysis: req
+                    .selection
+                    .as_ref()
+                    .map(|_| CashActivityAnalysis::empty(base_currency)),
             });
         }
         let all_spending_account_ids: HashSet<&str> =
@@ -373,6 +448,10 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
+                analysis: req
+                    .selection
+                    .as_ref()
+                    .map(|_| CashActivityAnalysis::empty(base_currency)),
             });
         }
 
@@ -453,6 +532,8 @@ impl CashActivityService {
                 .map(|v| !v.is_empty())
                 .unwrap_or(false);
 
+        let mut analysis_assignments = AssignmentsByActivity::new();
+        let mut analysis_splits = SplitsByActivity::new();
         if needs_assignments_for_filter {
             let ids: Vec<String> = activities.iter().map(|a| a.id.clone()).collect();
             let assignments = self.assignments.list_for_activities(&ids).await?;
@@ -542,15 +623,25 @@ impl CashActivityService {
 
                 true
             });
+            if req.selection.is_some() {
+                analysis_assignments = group_assignments_owned(assignments);
+                analysis_splits = group_splits_owned(splits);
+            }
         }
 
         // Sort
         match req.sort_by {
             CashActivitySortField::Date => match req.sort_dir {
-                SortDirection::Desc => {
-                    activities.sort_by_key(|a| std::cmp::Reverse(a.activity_date))
-                }
-                SortDirection::Asc => activities.sort_by_key(|a| a.activity_date),
+                SortDirection::Desc => activities.sort_by(|a, b| {
+                    b.activity_date
+                        .cmp(&a.activity_date)
+                        .then_with(|| a.id.cmp(&b.id))
+                }),
+                SortDirection::Asc => activities.sort_by(|a, b| {
+                    a.activity_date
+                        .cmp(&b.activity_date)
+                        .then_with(|| a.id.cmp(&b.id))
+                }),
             },
             CashActivitySortField::Amount => {
                 activities.sort_by(|a, b| {
@@ -560,11 +651,27 @@ impl CashActivityService {
                         SortDirection::Desc => bv.cmp(&av),
                         SortDirection::Asc => av.cmp(&bv),
                     }
+                    .then_with(|| a.id.cmp(&b.id))
                 });
             }
         }
 
         let total_count = activities.len();
+        let analysis = req.selection.as_ref().map(|selection| {
+            self.selection_analysis(
+                &activities,
+                selection,
+                &account_types,
+                &account_currencies,
+                &transfer_groups,
+                &analysis_assignments,
+                &analysis_splits,
+                req.category_ids.as_deref(),
+                req.subcategory_ids.as_deref(),
+                base_currency,
+                timezone,
+            )
+        });
 
         // Net the FULL filtered set before paginating, so the figure covers every
         // matching row rather than the page about to be sliced out. Only the
@@ -632,7 +739,99 @@ impl CashActivityService {
             total_count,
             net,
             base_currency: base_currency.map(str::to_string),
+            analysis,
         })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn selection_analysis(
+        &self,
+        activities: &[Activity],
+        selection: &CashActivitySelection,
+        account_types: &HashMap<String, String>,
+        account_currencies: &HashMap<String, String>,
+        transfer_groups: &HashSet<String>,
+        assignments: &AssignmentsByActivity,
+        splits: &SplitsByActivity,
+        category_ids: Option<&[String]>,
+        subcategory_ids: Option<&[String]>,
+        base_currency: Option<&str>,
+        timezone: Tz,
+    ) -> CashActivityAnalysis {
+        let ids: HashSet<&str> = selection.ids.iter().map(String::as_str).collect();
+        let category_filters: Vec<&[String]> = [category_ids, subcategory_ids]
+            .into_iter()
+            .flatten()
+            .filter(|ids| !ids.is_empty())
+            .collect();
+        let mut matching = AnalysisTally::default();
+        let mut selected = AnalysisTally::default();
+        let mut excluded = AnalysisTally::default();
+        for activity in activities {
+            let cash = net_amount(activity, account_types);
+            let spending = account_types
+                .get(&activity.account_id)
+                .map(|account_type| {
+                    classify_activity_for_aggregation(activity, account_type, transfer_groups)
+                        .spending_amount(activity_abs_amount(activity))
+                })
+                .unwrap_or_default();
+            let spending = if category_filters.is_empty() {
+                spending
+            } else {
+                allocations_for_taxonomy(
+                    &activity.id,
+                    SPENDING_TAXONOMY,
+                    spending,
+                    assignments,
+                    splits,
+                )
+                .into_iter()
+                .filter(|allocation| {
+                    category_filters
+                        .iter()
+                        .all(|ids| ids.contains(&allocation.category_id))
+                })
+                .map(|allocation| allocation.amount)
+                .sum()
+            };
+            let convert = |amount| {
+                base_currency.and_then(|base| {
+                    self.net_amount_in_base(
+                        activity,
+                        amount,
+                        base,
+                        account_currencies
+                            .get(&activity.account_id)
+                            .map(String::as_str),
+                        timezone,
+                    )
+                })
+            };
+            let cash_base = convert(cash);
+            let spending_base = convert(spending);
+            let is_selected = match selection.mode {
+                CashActivitySelectionMode::All => !ids.contains(activity.id.as_str()),
+                CashActivitySelectionMode::Explicit => ids.contains(activity.id.as_str()),
+            };
+            let partition = if is_selected {
+                &mut selected
+            } else {
+                &mut excluded
+            };
+            for tally in [&mut matching, partition] {
+                tally.count += 1;
+                tally.cash_movement.add(&activity.currency, cash, cash_base);
+                tally
+                    .spending
+                    .add(&activity.currency, spending, spending_base);
+            }
+        }
+        CashActivityAnalysis {
+            matching: matching.finish(base_currency),
+            selected: selected.finish(base_currency),
+            excluded: excluded.finish(base_currency),
+        }
     }
 
     /// Fetch explicit activity ids without applying the normal status/date/limit
@@ -1272,14 +1471,22 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct MockSettingsRepo;
+    struct MockSettingsRepo {
+        disabled: bool,
+        account_ids: Option<Vec<String>>,
+    }
 
     #[async_trait]
     impl SpendingSettingsRepositoryTrait for MockSettingsRepo {
         async fn get_setting(&self, key: &str) -> Result<Option<String>> {
             match key {
-                SETTING_KEY_ENABLED => Ok(Some("true".to_string())),
-                SETTING_KEY_ACCOUNT_IDS => Ok(Some(r#"["account-1"]"#.to_string())),
+                SETTING_KEY_ENABLED => Ok(Some((!self.disabled).to_string())),
+                SETTING_KEY_ACCOUNT_IDS => Ok(Some(serde_json::to_string(
+                    &self
+                        .account_ids
+                        .clone()
+                        .unwrap_or_else(|| vec!["account-1".to_string()]),
+                )?)),
                 _ => Ok(None),
             }
         }
@@ -1611,6 +1818,7 @@ mod tests {
     #[derive(Default)]
     struct MockAssignmentRepo {
         cleared: Mutex<Vec<(String, String)>>,
+        assignments: Mutex<Vec<ActivityTaxonomyAssignment>>,
     }
 
     #[async_trait]
@@ -1621,9 +1829,16 @@ mod tests {
 
         async fn list_for_activities(
             &self,
-            _: &[String],
+            ids: &[String],
         ) -> Result<Vec<ActivityTaxonomyAssignment>> {
-            Ok(Vec::new())
+            Ok(self
+                .assignments
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|assignment| ids.contains(&assignment.activity_id))
+                .cloned()
+                .collect())
         }
 
         async fn upsert(
@@ -1674,6 +1889,7 @@ mod tests {
         assignment_clears: Mutex<Vec<(String, String)>>,
         cleared: Mutex<Vec<String>>,
         categories_valid: Mutex<bool>,
+        splits: Mutex<Vec<ActivitySplit>>,
     }
 
     #[async_trait]
@@ -1682,8 +1898,15 @@ mod tests {
             Ok(Vec::new())
         }
 
-        async fn list_for_activities(&self, _: &[String]) -> Result<Vec<ActivitySplit>> {
-            Ok(Vec::new())
+        async fn list_for_activities(&self, ids: &[String]) -> Result<Vec<ActivitySplit>> {
+            Ok(self
+                .splits
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|split| ids.contains(&split.activity_id))
+                .cloned()
+                .collect())
         }
 
         async fn categories_belong_to_taxonomy(&self, _: &str, _: &[String]) -> Result<bool> {
@@ -1736,15 +1959,22 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct MockActivityEventsRepo;
+    struct MockActivityEventsRepo {
+        tags: HashMap<String, String>,
+    }
 
     #[async_trait]
     impl crate::activity_events::ActivityEventsRepositoryTrait for MockActivityEventsRepo {
         async fn list_for_activities(
             &self,
-            _: &[String],
+            ids: &[String],
         ) -> Result<std::collections::HashMap<String, String>> {
-            Ok(std::collections::HashMap::new())
+            Ok(self
+                .tags
+                .iter()
+                .filter(|(id, _)| ids.contains(id))
+                .map(|(id, tag)| (id.clone(), tag.clone()))
+                .collect())
         }
 
         async fn list_for_event(&self, _: &str) -> Result<Vec<String>> {
@@ -1857,6 +2087,7 @@ mod tests {
     #[derive(Default)]
     struct DateCapturingFx {
         dates: std::sync::Mutex<Vec<chrono::NaiveDate>>,
+        rates: HashMap<chrono::NaiveDate, Decimal>,
     }
 
     #[async_trait]
@@ -1900,7 +2131,7 @@ mod tests {
             date: chrono::NaiveDate,
         ) -> wealthfolio_core::Result<Decimal> {
             self.dates.lock().unwrap().push(date);
-            Ok(amount)
+            Ok(amount * self.rates.get(&date).copied().unwrap_or(Decimal::ONE))
         }
         fn get_latest_exchange_rates(
             &self,
@@ -2089,7 +2320,9 @@ mod tests {
         let account_repo = Arc::new(MockAccountRepo {
             account: account(account_types::CASH),
         });
-        let settings = Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo)));
+        let settings = Arc::new(SpendingSettingsService::new(Arc::new(
+            MockSettingsRepo::default(),
+        )));
         let assignment_repo = Arc::new(MockAssignmentRepo::default());
         let assignment_service = Arc::new(ActivityTaxonomyAssignmentService::new(
             assignment_repo.clone()
@@ -2097,7 +2330,7 @@ mod tests {
         ));
         let split_repo = Arc::new(MockSplitRepo::default());
         *split_repo.categories_valid.lock().unwrap() = true;
-        let activity_events = Arc::new(MockActivityEventsRepo);
+        let activity_events = Arc::new(MockActivityEventsRepo::default());
         let events = Arc::new(EventsService::new(
             Arc::new(MockEventTypesRepo),
             Arc::new(MockEventsRepo),
@@ -2140,6 +2373,1005 @@ mod tests {
             amount: Some(Decimal::new(amount, 0)),
             currency: currency.to_string(),
             ..activity(activity_type)
+        }
+    }
+
+    fn analysis_request(
+        mode: CashActivitySelectionMode,
+        ids: &[&str],
+    ) -> CashActivitySearchRequest {
+        CashActivitySearchRequest {
+            selection: Some(CashActivitySelection {
+                mode,
+                ids: ids.iter().map(|id| id.to_string()).collect(),
+            }),
+            limit: 0,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn search_selection_request_round_trips_the_wire_contract() {
+        for mode in ["all", "explicit"] {
+            let json = serde_json::json!({
+                "selection": { "mode": mode, "ids": ["synthetic-id"] },
+                "offset": 0,
+                "limit": 0,
+            });
+            let request: CashActivitySearchRequest = serde_json::from_value(json.clone()).unwrap();
+            assert_eq!(
+                serde_json::to_value(request).unwrap()["selection"],
+                json["selection"]
+            );
+        }
+        let request: CashActivitySearchRequest =
+            serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(request.selection.is_none());
+        assert_eq!(request.limit, 50);
+    }
+
+    fn exact_amount(summary: &ExactMoneySummary, currency: &str) -> Decimal {
+        summary
+            .by_currency
+            .iter()
+            .find(|entry| entry.currency == currency)
+            .map(|entry| entry.amount.parse().unwrap())
+            .unwrap_or_default()
+    }
+
+    fn assert_partition(analysis: &CashActivityAnalysis) {
+        assert_eq!(
+            analysis.matching.count,
+            analysis.selected.count + analysis.excluded.count
+        );
+        for (matching, selected, excluded) in [
+            (
+                &analysis.matching.cash_movement,
+                &analysis.selected.cash_movement,
+                &analysis.excluded.cash_movement,
+            ),
+            (
+                &analysis.matching.spending,
+                &analysis.selected.spending,
+                &analysis.excluded.spending,
+            ),
+        ] {
+            for currency in matching
+                .by_currency
+                .iter()
+                .chain(&selected.by_currency)
+                .chain(&excluded.by_currency)
+            {
+                assert_eq!(
+                    exact_amount(matching, &currency.currency),
+                    exact_amount(selected, &currency.currency)
+                        + exact_amount(excluded, &currency.currency),
+                );
+            }
+            if let Some(total) = &matching.converted {
+                let selected = selected.converted.as_ref().unwrap();
+                let excluded = excluded.converted.as_ref().unwrap();
+                assert_eq!(total.currency, selected.currency);
+                assert_eq!(total.currency, excluded.currency);
+                assert_eq!(
+                    total.amount.parse::<Decimal>().unwrap(),
+                    selected.amount.parse::<Decimal>().unwrap()
+                        + excluded.amount.parse::<Decimal>().unwrap(),
+                );
+            }
+            let missing: BTreeSet<_> = selected
+                .missing_rate_currencies
+                .iter()
+                .chain(&excluded.missing_rate_currencies)
+                .cloned()
+                .collect();
+            assert_eq!(
+                matching.missing_rate_currencies,
+                missing.into_iter().collect::<Vec<_>>()
+            );
+        }
+    }
+
+    fn assignment_row(activity_id: &str, category: &str) -> ActivityTaxonomyAssignment {
+        ActivityTaxonomyAssignment {
+            id: format!("{activity_id}-{category}"),
+            activity_id: activity_id.to_string(),
+            taxonomy_id: SPENDING_TAXONOMY.to_string(),
+            category_id: category.to_string(),
+            weight: 10_000,
+            source: "manual".to_string(),
+            created_at: now_naive(),
+            updated_at: now_naive(),
+        }
+    }
+
+    fn split_row(activity_id: &str, category: &str, amount: &str) -> ActivitySplit {
+        ActivitySplit {
+            id: format!("{activity_id}-{category}"),
+            activity_id: activity_id.to_string(),
+            taxonomy_id: SPENDING_TAXONOMY.to_string(),
+            category_id: category.to_string(),
+            amount: amount.parse().unwrap(),
+            note: None,
+            sort_order: 0,
+            created_at: now_naive(),
+            updated_at: now_naive(),
+        }
+    }
+
+    #[tokio::test]
+    async fn search_analysis_covers_more_than_fifty_and_one_thousand_rows_before_pagination() {
+        for count in [73, 1_207] {
+            let rows = (0..count)
+                .map(|i| {
+                    let mut row = cash_row(&format!("row-{i:04}"), "WITHDRAWAL", 0, "USD");
+                    row.amount = Some(Decimal::new(1, 2));
+                    row
+                })
+                .collect();
+            let (service, _, _) = make_service_with(rows);
+            let mut request = analysis_request(
+                CashActivitySelectionMode::All,
+                &["row-0001", "row-0059", "row-1205", "unknown"],
+            );
+            request.limit = 50;
+            let response = service
+                .search(request.clone(), Some("USD"), "UTC")
+                .await
+                .unwrap();
+            assert_eq!(response.total_count, count);
+            assert_eq!(response.items.len(), 50);
+            let analysis = response.analysis.unwrap();
+            let excluded = if count > 1_000 { 3 } else { 2 };
+            assert_eq!(analysis.matching.count, count);
+            assert_eq!(analysis.selected.count, count - excluded);
+            assert_eq!(analysis.excluded.count, excluded);
+            assert_eq!(
+                exact_amount(&analysis.matching.spending, "USD"),
+                Decimal::new(count as i64, 2)
+            );
+            assert_eq!(
+                exact_amount(&analysis.selected.spending, "USD"),
+                Decimal::new((count - excluded) as i64, 2)
+            );
+            assert_partition(&analysis);
+
+            request.offset = 55;
+            request.limit = 0;
+            let response = service
+                .search(request.clone(), Some("USD"), "UTC")
+                .await
+                .unwrap();
+            assert!(response.items.is_empty());
+            assert!(response.net.is_none());
+            assert_eq!(response.analysis.unwrap(), analysis);
+            request.offset = 0;
+            request.limit = usize::MAX;
+            let response = service.search(request, Some("USD"), "UTC").await.unwrap();
+            assert_eq!(response.items.len(), count.min(1_000));
+            assert_eq!(response.analysis.unwrap(), analysis);
+        }
+    }
+
+    #[tokio::test]
+    async fn search_analysis_explicit_empty_duplicate_unknown_and_filtered_ids() {
+        let mut included = cash_row("included", "WITHDRAWAL", 11, "USD");
+        included.notes = Some("synthetic matched".into());
+        let filtered = cash_row("filtered-out", "WITHDRAWAL", 999, "USD");
+        let (service, _, _) = make_service_with(vec![included, filtered]);
+        for (mode, ids, expected) in [
+            (
+                CashActivitySelectionMode::Explicit,
+                vec!["included", "included", "unknown", "filtered-out"],
+                1,
+            ),
+            (CashActivitySelectionMode::Explicit, vec![], 0),
+            (
+                CashActivitySelectionMode::Explicit,
+                vec!["unknown", "filtered-out"],
+                0,
+            ),
+            (CashActivitySelectionMode::All, vec![], 1),
+            (
+                CashActivitySelectionMode::All,
+                vec!["included", "included"],
+                0,
+            ),
+            (
+                CashActivitySelectionMode::All,
+                vec!["unknown", "filtered-out"],
+                1,
+            ),
+        ] {
+            let mut request = analysis_request(mode, &ids);
+            request.search = Some("MATCHED".into());
+            let analysis = service
+                .search(request, Some("USD"), "UTC")
+                .await
+                .unwrap()
+                .analysis
+                .unwrap();
+            assert_eq!(analysis.matching.count, 1);
+            assert_eq!(analysis.selected.count, expected);
+            assert_eq!(
+                exact_amount(&analysis.selected.spending, "USD"),
+                Decimal::new(expected as i64 * 11, 0)
+            );
+            assert_partition(&analysis);
+        }
+    }
+
+    #[tokio::test]
+    async fn search_analysis_serializes_exact_decimal_strings_without_float_aggregation() {
+        let mut large = cash_row("large", "WITHDRAWAL", 0, "USD");
+        large.amount = Some("9007199254740993.1".parse().unwrap());
+        let mut small = cash_row("small", "WITHDRAWAL", 0, "USD");
+        small.amount = Some("0.2".parse().unwrap());
+        let (service, _, _) = make_service_with(vec![large, small]);
+        let response = service
+            .search(
+                analysis_request(CashActivitySelectionMode::Explicit, &["small"]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(
+            json["analysis"]["matching"]["spending"]["byCurrency"][0]["amount"],
+            "9007199254740993.3"
+        );
+        assert_eq!(
+            json["analysis"]["matching"]["cashMovement"]["converted"]["amount"],
+            "-9007199254740993.3"
+        );
+        assert_eq!(
+            json["analysis"]["selected"]["spending"]["converted"]["amount"],
+            "0.2"
+        );
+        assert_partition(response.analysis.as_ref().unwrap());
+    }
+
+    #[tokio::test]
+    async fn search_analysis_mixed_currencies_stored_fx_and_missing_rates_are_partitioned() {
+        let mut stored = cash_row("stored", "WITHDRAWAL", 10, "EUR");
+        stored.fx_rate = Some(Decimal::new(15, 1));
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                stored,
+                cash_row("lookup", "WITHDRAWAL", 20, "EUR"),
+                cash_row("native", "WITHDRAWAL", 3, "USD"),
+                cash_row("unrated", "WITHDRAWAL", 7, "GBP"),
+            ],
+            MockFx::with(&[("EUR", 2, 0)]),
+        );
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &["unrated"]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(analysis.matching.spending.missing_rate_currencies, ["GBP"]);
+        assert!(analysis.matching.spending.converted.is_none());
+        assert!(analysis.excluded.cash_movement.converted.is_none());
+        assert_eq!(
+            analysis
+                .selected
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "58"
+        );
+        assert_eq!(
+            analysis
+                .selected
+                .cash_movement
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "-58"
+        );
+        assert_eq!(
+            exact_amount(&analysis.matching.spending, "EUR"),
+            Decimal::new(30, 0)
+        );
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_analysis_preserves_native_zero_fx_residuals_and_unrated_cancellations() {
+        let mut refund = cash_row("refund", "CREDIT", 10, "EUR");
+        refund.subtype = Some("REFUND".into());
+        let mut debit = cash_row("debit", "WITHDRAWAL", 10, "EUR");
+        debit.fx_rate = Some(Decimal::new(2, 0));
+        refund.fx_rate = Some(Decimal::new(3, 0));
+        let (service, _, _) = make_service_with(vec![debit.clone(), refund.clone()]);
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::Explicit, &["debit"]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert!(analysis.matching.spending.by_currency.is_empty());
+        assert!(analysis.matching.cash_movement.by_currency.is_empty());
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "-10"
+        );
+        assert_eq!(
+            analysis
+                .matching
+                .cash_movement
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "10"
+        );
+        assert_partition(&analysis);
+
+        debit.fx_rate = None;
+        refund.fx_rate = None;
+        let (service, _, _) = make_service_with(vec![debit, refund]);
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert!(analysis.matching.spending.by_currency.is_empty());
+        assert!(analysis.matching.spending.converted.is_none());
+        assert_eq!(analysis.matching.spending.missing_rate_currencies, ["EUR"]);
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_analysis_uses_each_local_date_for_fx_and_keeps_single_currency_conversion() {
+        let first_date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        let second_date = NaiveDate::from_ymd_opt(2026, 1, 2).unwrap();
+        let fx = Arc::new(DateCapturingFx {
+            dates: Mutex::new(Vec::new()),
+            rates: HashMap::from([
+                (first_date, Decimal::new(2, 0)),
+                (second_date, Decimal::new(3, 0)),
+            ]),
+        });
+        let mut first = cash_row("first", "WITHDRAWAL", 10, "EUR");
+        first.activity_date = "2026-01-02T01:00:00Z".parse().unwrap();
+        let mut second = cash_row("second", "WITHDRAWAL", 10, "EUR");
+        second.activity_date = "2026-01-03T01:00:00Z".parse().unwrap();
+        let (service, _, _) = make_service_with_fx(vec![first, second], fx.clone());
+        let mut request = analysis_request(CashActivitySelectionMode::All, &[]);
+        request.offset = 1;
+        let analysis = service
+            .search(request, Some("USD"), "America/Los_Angeles")
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "50"
+        );
+        let dates = fx.dates.lock().unwrap();
+        assert_eq!(dates.len(), 4);
+        assert!(dates
+            .iter()
+            .all(|date| *date == first_date || *date == second_date));
+        assert!(dates.contains(&first_date) && dates.contains(&second_date));
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_analysis_fx_override_requires_account_currency_and_nonzero_rate() {
+        let mut row = cash_row("row", "WITHDRAWAL", 10, "EUR");
+        row.fx_rate = Some(Decimal::new(9, 0));
+        let (service, _, _) =
+            make_service_with_fx(vec![row.clone()], MockFx::with(&[("EUR", 2, 0)]));
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                Some("GBP"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "20"
+        );
+        row.fx_rate = Some(Decimal::ZERO);
+        let (service, _, _) = make_service_with_fx(vec![row], MockFx::with(&[("EUR", 2, 0)]));
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "20"
+        );
+    }
+
+    #[tokio::test]
+    async fn search_analysis_reuses_classification_for_refunds_income_savings_and_overrides() {
+        let mut refund = cash_row("refund", "CREDIT", 12, "USD");
+        refund.subtype = Some("REFUND".into());
+        let mut saving = cash_row("saving", "TRANSFER_OUT", 200, "USD");
+        saving.source_group_id = Some("to-investments".into());
+        let mut incoming = cash_row("incoming", "TRANSFER_IN", 30, "USD");
+        incoming.source_group_id = Some("from-investments".into());
+        let mut effective = cash_row("effective", "DEPOSIT", 8, "USD");
+        effective.activity_type_override = Some("WITHDRAWAL".into());
+        let (service, _, _) = make_service_with(vec![
+            cash_row("expense", "WITHDRAWAL", -100, "USD"),
+            cash_row("income", "DEPOSIT", 500, "USD"),
+            cash_row("unlinked", "TRANSFER_OUT", 4, "USD"),
+            refund,
+            saving,
+            incoming,
+            effective,
+        ]);
+        let analysis = service
+            .search(
+                analysis_request(
+                    CashActivitySelectionMode::Explicit,
+                    &["expense", "refund", "effective"],
+                ),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(analysis.matching.count, 7);
+        assert_eq!(
+            exact_amount(&analysis.matching.spending, "USD"),
+            Decimal::new(100, 0)
+        );
+        assert_eq!(
+            exact_amount(&analysis.selected.spending, "USD"),
+            Decimal::new(96, 0)
+        );
+        assert_eq!(
+            exact_amount(&analysis.matching.cash_movement, "USD"),
+            Decimal::new(230, 0)
+        );
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_analysis_keeps_transfer_context_outside_date_and_type_filters() {
+        let mut outbound = cash_row("outbound", "TRANSFER_OUT", 100, "USD");
+        outbound.source_group_id = Some("internal".into());
+        outbound.activity_date = "2026-02-01T12:00:00Z".parse().unwrap();
+        let mut inbound = cash_row("inbound", "TRANSFER_IN", 100, "USD");
+        inbound.source_group_id = Some("internal".into());
+        inbound.activity_date = "2026-01-31T12:00:00Z".parse().unwrap();
+        let (service, _, _) = make_service_with(vec![outbound, inbound]);
+        let mut request = analysis_request(CashActivitySelectionMode::All, &[]);
+        request.start_date = Some("2026-02-01T00:00:00Z".into());
+        request.activity_types = Some(vec!["TRANSFER_OUT".into()]);
+        let analysis = service
+            .search(request, Some("USD"), "UTC")
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(analysis.matching.count, 1);
+        assert_eq!(
+            analysis
+                .matching
+                .cash_movement
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "-100"
+        );
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "0"
+        );
+    }
+
+    #[tokio::test]
+    async fn search_analysis_credit_card_interest_refunds_and_neutral_payments() {
+        let (mut service, _, _) = make_service_with(vec![
+            cash_row("interest", "INTEREST", 10, "USD"),
+            cash_row("refund", "CREDIT", 2, "USD"),
+            cash_row("payment", "TRANSFER_IN", 100, "USD"),
+        ]);
+        service.account_repo = Arc::new(MockAccountRepo {
+            account: account(account_types::CREDIT_CARD),
+        });
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(analysis.matching.count, 3);
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "8"
+        );
+        assert_eq!(
+            analysis
+                .matching
+                .cash_movement
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "92"
+        );
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_analysis_filters_spending_allocations_but_keeps_whole_cash_movements() {
+        let mut refund = cash_row("refund", "CREDIT", 20, "EUR");
+        refund.subtype = Some("REFUND".into());
+        let (service, assignments, splits) = make_service_with_fx(
+            vec![
+                cash_row("expense", "WITHDRAWAL", 100, "EUR"),
+                refund,
+                cash_row("assigned", "WITHDRAWAL", 3, "EUR"),
+            ],
+            MockFx::with(&[("EUR", 2, 0)]),
+        );
+        *assignments.assignments.lock().unwrap() = vec![
+            assignment_row("expense", "groceries"),
+            assignment_row("refund", "groceries"),
+            assignment_row("assigned", "groceries"),
+        ];
+        *splits.splits.lock().unwrap() = vec![
+            split_row("expense", "groceries", "40"),
+            split_row("expense", "household", "60"),
+            split_row("refund", "groceries", "10"),
+            split_row("refund", "household", "10"),
+        ];
+        for (category_ids, subcategory_ids) in [
+            (Some(vec!["groceries".into()]), None),
+            (None, Some(vec!["groceries".into()])),
+            (
+                Some(vec!["groceries".into(), "household".into()]),
+                Some(vec!["groceries".into()]),
+            ),
+        ] {
+            let mut request = analysis_request(CashActivitySelectionMode::All, &["refund"]);
+            request.category_ids = category_ids;
+            request.subcategory_ids = subcategory_ids;
+            let analysis = service
+                .search(request, Some("USD"), "UTC")
+                .await
+                .unwrap()
+                .analysis
+                .unwrap();
+            assert_eq!(analysis.matching.count, 3);
+            assert_eq!(
+                exact_amount(&analysis.matching.spending, "EUR"),
+                Decimal::new(33, 0)
+            );
+            assert_eq!(
+                analysis
+                    .matching
+                    .spending
+                    .converted
+                    .as_ref()
+                    .unwrap()
+                    .amount,
+                "66"
+            );
+            assert_eq!(
+                analysis
+                    .matching
+                    .cash_movement
+                    .converted
+                    .as_ref()
+                    .unwrap()
+                    .amount,
+                "-166"
+            );
+            assert_eq!(
+                analysis
+                    .selected
+                    .spending
+                    .converted
+                    .as_ref()
+                    .unwrap()
+                    .amount,
+                "86"
+            );
+            assert_partition(&analysis);
+        }
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "166"
+        );
+    }
+
+    #[tokio::test]
+    async fn search_analysis_splits_take_precedence_over_stale_assignment() {
+        let (service, assignments, splits) =
+            make_service_with(vec![cash_row("expense", "WITHDRAWAL", 100, "EUR")]);
+        *assignments.assignments.lock().unwrap() = vec![assignment_row("expense", "groceries")];
+        *splits.splits.lock().unwrap() = vec![split_row("expense", "household", "100")];
+        let mut request = analysis_request(CashActivitySelectionMode::All, &[]);
+        request.category_ids = Some(vec!["groceries".into()]);
+        let analysis = service
+            .search(request, Some("USD"), "UTC")
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        // Existing search matching is unchanged; the stale assignment must not
+        // contribute to category actuals when canonical splits replace it.
+        assert_eq!(analysis.matching.count, 1);
+        assert_eq!(
+            analysis
+                .matching
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "0"
+        );
+        assert!(analysis
+            .matching
+            .spending
+            .missing_rate_currencies
+            .is_empty());
+        assert_eq!(
+            analysis.matching.cash_movement.missing_rate_currencies,
+            ["EUR"]
+        );
+    }
+
+    #[tokio::test]
+    async fn search_analysis_uses_the_same_account_status_event_amount_and_text_filters() {
+        let mut matched = cash_row("matched", "WITHDRAWAL", 12, "USD");
+        matched.needs_review = true;
+        matched.notes = Some("Synthetic merchant".into());
+        matched.activity_date = "2026-02-03T12:00:00Z".parse().unwrap();
+        let mut rows = vec![matched.clone()];
+        for (id, change) in [
+            ("account", 0),
+            ("status", 1),
+            ("event", 2),
+            ("amount", 3),
+            ("text", 4),
+            ("date", 5),
+            ("type", 6),
+        ] {
+            let mut row = matched.clone();
+            row.id = id.into();
+            match change {
+                0 => row.account_id = "not-opted-in".into(),
+                1 => row.needs_review = false,
+                2 => {}
+                3 => row.amount = Some(Decimal::new(100, 0)),
+                4 => row.notes = None,
+                5 => row.activity_date = "2026-01-01T00:00:00Z".parse().unwrap(),
+                _ => row.activity_type = "DEPOSIT".into(),
+            }
+            rows.push(row);
+        }
+        let (mut service, _, _) = make_service_with(rows.clone());
+        service.activity_events = Arc::new(MockActivityEventsRepo {
+            tags: rows
+                .iter()
+                .filter(|row| row.id != "event")
+                .map(|row| (row.id.clone(), "synthetic-event".into()))
+                .collect(),
+        });
+        let mut request = analysis_request(CashActivitySelectionMode::All, &["event", "account"]);
+        request.search = Some("MERCHANT".into());
+        request.account_ids = Some(vec!["account-1".into(), "not-opted-in".into()]);
+        request.activity_types = Some(vec!["WITHDRAWAL".into()]);
+        request.status = CashActivityStatusFilter::NeedsReview;
+        request.event_ids = Some(vec!["synthetic-event".into()]);
+        request.min_amount = Some(10.0);
+        request.max_amount = Some(20.0);
+        request.start_date = Some("2026-02-01T00:00:00Z".into());
+        request.end_date = Some("2026-02-28T00:00:00Z".into());
+        let analysis = service
+            .search(request, Some("USD"), "UTC")
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(analysis.matching.count, 1);
+        assert_eq!(
+            analysis
+                .selected
+                .spending
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "12"
+        );
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_analysis_empty_disabled_and_no_accounts_return_honest_zero_totals() {
+        for mode in [
+            CashActivitySelectionMode::All,
+            CashActivitySelectionMode::Explicit,
+        ] {
+            for base in [None, Some("USD")] {
+                for scenario in 0..5 {
+                    let (mut service, _, _) =
+                        make_service_with(vec![cash_row("row", "WITHDRAWAL", 5, "USD")]);
+                    let mut request = analysis_request(mode, &["row"]);
+                    match scenario {
+                        0 => request.search = Some("no match".into()),
+                        1 => {
+                            service.settings =
+                                Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo {
+                                    disabled: true,
+                                    ..Default::default()
+                                })))
+                        }
+                        2 => {
+                            service.settings =
+                                Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo {
+                                    account_ids: Some(vec![]),
+                                    ..Default::default()
+                                })))
+                        }
+                        3 => request.account_ids = Some(vec!["outside".into()]),
+                        _ => {
+                            service.settings =
+                                Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo {
+                                    account_ids: Some(vec!["missing-account".into()]),
+                                    ..Default::default()
+                                })))
+                        }
+                    }
+                    let response = service.search(request, base, "UTC").await.unwrap();
+                    assert_eq!(response.total_count, 0);
+                    assert_eq!(
+                        response.analysis.unwrap(),
+                        CashActivityAnalysis::empty(base)
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn search_analysis_categorized_status_uses_splits_and_assignments() {
+        let (service, assignments, splits) = make_service_with(vec![
+            cash_row("assigned", "WITHDRAWAL", 10, "USD"),
+            cash_row("split", "WITHDRAWAL", 20, "USD"),
+            cash_row("unassigned", "WITHDRAWAL", 30, "USD"),
+        ]);
+        *assignments.assignments.lock().unwrap() = vec![assignment_row("assigned", "groceries")];
+        *splits.splits.lock().unwrap() = vec![split_row("split", "groceries", "20")];
+        for (status, count) in [
+            (CashActivityStatusFilter::Categorized, 2),
+            (CashActivityStatusFilter::Uncategorized, 1),
+        ] {
+            let mut request = analysis_request(CashActivitySelectionMode::All, &[]);
+            request.status = status;
+            let analysis = service
+                .search(request, Some("USD"), "UTC")
+                .await
+                .unwrap()
+                .analysis
+                .unwrap();
+            assert_eq!(analysis.matching.count, count);
+            assert_eq!(
+                analysis
+                    .matching
+                    .spending
+                    .converted
+                    .as_ref()
+                    .unwrap()
+                    .amount,
+                "30"
+            );
+            assert_partition(&analysis);
+        }
+    }
+
+    #[tokio::test]
+    async fn search_analysis_zero_cash_does_not_require_fx_but_spending_uses_canonical_classification(
+    ) {
+        let mut pending = cash_row("pending", "WITHDRAWAL", 10, "EUR");
+        pending.status = ActivityStatus::Pending;
+        let (service, _, _) =
+            make_service_with(vec![pending, cash_row("zero", "WITHDRAWAL", 0, "GBP")]);
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(analysis.matching.count, 2);
+        assert_eq!(
+            analysis
+                .matching
+                .cash_movement
+                .converted
+                .as_ref()
+                .unwrap()
+                .amount,
+            "0"
+        );
+        assert!(analysis
+            .matching
+            .cash_movement
+            .missing_rate_currencies
+            .is_empty());
+        assert_eq!(
+            exact_amount(&analysis.matching.spending, "EUR"),
+            Decimal::new(10, 0)
+        );
+        assert_eq!(analysis.matching.spending.missing_rate_currencies, ["EUR"]);
+        assert_partition(&analysis);
+    }
+
+    #[tokio::test]
+    async fn search_without_selection_omits_analysis_and_does_not_convert_for_it() {
+        let fx = Arc::new(DateCapturingFx::default());
+        let (service, _, _) =
+            make_service_with_fx(vec![cash_row("row", "WITHDRAWAL", 10, "EUR")], fx.clone());
+        let request: CashActivitySearchRequest = serde_json::from_value(serde_json::json!({
+            "offset": 1, "limit": 0
+        }))
+        .unwrap();
+        assert!(request.selection.is_none());
+        let response = service.search(request, Some("USD"), "UTC").await.unwrap();
+        assert!(response.analysis.is_none());
+        assert!(serde_json::to_value(response)
+            .unwrap()
+            .get("analysis")
+            .is_none());
+        assert!(fx.dates.lock().unwrap().is_empty());
+        let analysis = service
+            .search(
+                analysis_request(CashActivitySelectionMode::All, &[]),
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .analysis
+            .unwrap();
+        assert_eq!(
+            exact_amount(&analysis.matching.spending, "EUR"),
+            Decimal::new(10, 0)
+        );
+        assert!(analysis.matching.spending.converted.is_none());
+        assert!(analysis
+            .matching
+            .spending
+            .missing_rate_currencies
+            .is_empty());
+        assert!(fx.dates.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_sort_ties_use_ids_for_stable_page_boundaries() {
+        let mut rows: Vec<_> = ["c", "b", "a"]
+            .into_iter()
+            .map(|id| cash_row(id, "WITHDRAWAL", 1, "USD"))
+            .collect();
+        for row in &mut rows {
+            row.activity_date = "2026-01-01T00:00:00Z".parse().unwrap();
+        }
+        let (service, _, _) = make_service_with(rows);
+        for sort_by in [CashActivitySortField::Date, CashActivitySortField::Amount] {
+            for sort_dir in [SortDirection::Asc, SortDirection::Desc] {
+                let mut ids = Vec::new();
+                for offset in 0..3 {
+                    let response = service
+                        .search(
+                            CashActivitySearchRequest {
+                                offset,
+                                limit: 1,
+                                sort_by,
+                                sort_dir,
+                                ..Default::default()
+                            },
+                            None,
+                            "UTC",
+                        )
+                        .await
+                        .unwrap();
+                    ids.push(response.items[0].activity.id.clone());
+                }
+                assert_eq!(ids, ["a", "b", "c"]);
+            }
         }
     }
 

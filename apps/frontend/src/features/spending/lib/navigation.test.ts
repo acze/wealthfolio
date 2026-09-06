@@ -26,6 +26,32 @@ describe("buildCashflowUrl", () => {
       buildCashflowUrl({ status: "uncategorized", startDate: "2026-01-01", endDate: "2026-08-28" }),
     ).toBe("/activities?tab=spending&status=uncategorized&from=2026-01-01&to=2026-08-28");
   });
+
+  it("opens analysis with category, subcategory, dates and available accounts", () => {
+    const url = buildCashflowUrl({
+      analysis: true,
+      categoryId: "cat/a&b",
+      subcategoryId: "nested child",
+      accountIds: ["account-z", "account/a&b", "account-z"],
+      startDate: "2026-01-01",
+      endDate: "2026-08-28",
+    });
+    const params = new URL(url, "https://synthetic.invalid").searchParams;
+    expect(url.startsWith("/activities?tab=spending&analysis=true")).toBe(true);
+    expect(Object.fromEntries(params)).toEqual({
+      tab: "spending",
+      analysis: "true",
+      category: "cat/a&b",
+      subcategory: "nested child",
+      from: "2026-01-01",
+      to: "2026-08-28",
+      accounts: "account-z,account/a&b",
+    });
+  });
+
+  it("does not invent account or analysis filters", () => {
+    expect(buildCashflowUrl({ accountIds: [], analysis: false })).toBe("/activities?tab=spending");
+  });
 });
 
 describe("spendingActivityHref", () => {
@@ -67,4 +93,18 @@ describe("spendingActivityHref", () => {
       "/activities?tab=spending&category=cat%2Fa%26b&from=2026-01-01&to=2026-08-28",
     );
   });
+
+  it.each(["cat_housing", "__uncategorized__"])(
+    "preserves available accounts and analysis mode for %s",
+    (id) => {
+      const params = new URL(
+        spendingActivityHref(id, { ...dates, accountIds: ["account-1"], analysis: true }),
+        "https://synthetic.invalid",
+      ).searchParams;
+      expect(params.get("accounts")).toBe("account-1");
+      expect(params.get("analysis")).toBe("true");
+      expect(params.get("from")).toBe(dates.startDate);
+      expect(params.get("to")).toBe(dates.endDate);
+    },
+  );
 });

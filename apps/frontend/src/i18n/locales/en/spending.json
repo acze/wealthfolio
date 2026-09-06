@@ -1,4 +1,24 @@
 {
+  "analysis": {
+    "title": "Selection analysis",
+    "start": "Analyze selection",
+    "exit": "Exit analysis",
+    "selectAll": "Select all matching",
+    "clear": "Clear selection",
+    "selected": "Selected",
+    "matching": "Full filtered total",
+    "excluded": "Excluded",
+    "count": "{{selected}} of {{matching}} matching transactions selected",
+    "updating": "Updating analysis...",
+    "error": "Analysis unavailable. No totals are shown.",
+    "netSpending": "Net spending",
+    "cashMovement": "Signed cash movement",
+    "noMovement": "No movement",
+    "missingRates": "No base-currency total: missing rates for {{currencies}}. Native totals shown.",
+    "byCurrency": "Original currencies",
+    "about": "How this analysis works",
+    "explanation": "Analysis never changes transactions. Select all matching covers every page; uncheck exceptions to exclude them. Changing a filter clears the selection. Net spending is consumption less refunds, excluding income, savings and internal transfers; category filters include only matching split allocations. Signed cash movement includes each whole transaction: positive money in, negative money out, including income and transfers. Converted totals use transaction-date rates."
+  },
   "common": {
     "amount": "Amount",
     "min": "Min",

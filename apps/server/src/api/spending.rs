@@ -21,7 +21,8 @@ use wealthfolio_spending::budget::{
     BudgetSnapshot, NewBudgetGroup, NewBudgetRolloverSetting, NewBudgetTarget, UpdateBudgetGroup,
 };
 use wealthfolio_spending::cash_activities::{
-    CashActivity, CashActivityFilter, CashActivitySearchRequest, CashActivitySearchResponse,
+    CashActivity, CashActivityAnalysis, CashActivityFilter, CashActivitySearchRequest,
+    CashActivitySearchResponse,
 };
 use wealthfolio_spending::categorization_rules::{
     CategorizationRule, CategorizationRulesService, NewCategorizationRule, UpdateCategorizationRule,
@@ -160,11 +161,19 @@ async fn search_cash_activities(
     Json(request): Json<CashActivitySearchRequest>,
 ) -> ApiResult<Json<CashActivitySearchResponse>> {
     if !spending_enabled(&state).await? {
+        let base_currency = request
+            .selection
+            .as_ref()
+            .map(|_| state.base_currency.read().unwrap().clone());
         return Ok(Json(CashActivitySearchResponse {
             items: Vec::new(),
             total_count: 0,
             net: Some(Default::default()),
-            base_currency: None,
+            analysis: request
+                .selection
+                .as_ref()
+                .map(|_| CashActivityAnalysis::empty(base_currency.as_deref())),
+            base_currency,
         }));
     }
     let base = state.base_currency.read().unwrap().clone();
