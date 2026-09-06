@@ -13,7 +13,6 @@
     "error": "Analysis unavailable. No totals are shown.",
     "netSpending": "Net spending",
     "cashMovement": "Signed cash movement",
-    "noMovement": "No movement",
     "missingRates": "No base-currency total: missing rates for {{currencies}}. Native totals shown.",
     "byCurrency": "Original currencies",
     "about": "How this analysis works",

@@ -1,10 +1,8 @@
 import { render, screen } from "@/test/render";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NetSummary } from "../types/cash-activity";
 import { TransactionsFilterBar } from "./transactions-filter-bar";
-
-const EMPTY: NetSummary = { byCurrency: [], converted: null };
 
 function net(
   byCurrency: NetSummary["byCurrency"],
@@ -14,7 +12,7 @@ function net(
 }
 
 function renderBar(
-  nets: { selectedNet?: NetSummary; filteredNet?: NetSummary | null },
+  nets: { selectedNet?: NetSummary | null; filteredNet?: NetSummary | null },
   overrides: { isMobile?: boolean } = {},
 ) {
   return render(
@@ -47,7 +45,7 @@ function renderBar(
       onClearAll={vi.fn()}
       visibleCount={2}
       totalCount={2}
-      selectedNet={nets.selectedNet ?? EMPTY}
+      selectedNet={nets.selectedNet ?? null}
       filteredNet={nets.filteredNet ?? null}
       isRefreshing={false}
       isMobile={overrides.isMobile}
@@ -56,6 +54,8 @@ function renderBar(
 }
 
 describe("TransactionsFilterBar net readouts", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("shows neither readout when there is nothing to report", () => {
     renderBar({});
 
@@ -72,6 +72,42 @@ describe("TransactionsFilterBar net readouts", () => {
     expect(screen.getByText("USD")).toBeInTheDocument();
     expect(screen.getByText("131.50")).toBeInTheDocument();
     expect(screen.queryByText("Filtered net")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    "keeps selected and filtered zero nets visible (mobile=%s)",
+    (isMobile) => {
+      renderBar({ selectedNet: net([]), filteredNet: net([]) }, { isMobile });
+
+      expect(screen.getByText("Selected net")).toBeVisible();
+      expect(screen.getByText("Filtered net")).toBeVisible();
+      expect(screen.getAllByText("0.00")).toHaveLength(2);
+    },
+  );
+
+  it("keeps a converted zero visible even without native currency rows", () => {
+    renderBar({ selectedNet: net([], { currency: "USD", amount: 0 }) });
+
+    expect(screen.getByText("Selected net")).toBeVisible();
+    expect(screen.getByText("$0.00")).toBeVisible();
+  });
+
+  it("keeps explicit zero currency rows visible", () => {
+    renderBar({ selectedNet: net([{ currency: "JPY", amount: 0 }]) });
+
+    expect(screen.getByText("Selected net")).toBeVisible();
+    expect(screen.getByText("JPY")).toBeVisible();
+    expect(screen.getByText("0")).toBeVisible();
+  });
+
+  it("masks zero readouts without removing their labels", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "true" });
+    renderBar({ selectedNet: net([]), filteredNet: net([]) });
+
+    expect(screen.getByText("Selected net")).toBeVisible();
+    expect(screen.getByText("Filtered net")).toBeVisible();
+    expect(screen.getAllByText("••••")).toHaveLength(2);
+    expect(screen.queryByText("0.00")).not.toBeInTheDocument();
   });
 
   it("shows both readouts at once", () => {

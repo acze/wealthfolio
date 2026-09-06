@@ -1,6 +1,12 @@
 import { useTranslation } from "react-i18next";
 
-import { Button, Skeleton, useAmountFormatting, useBalancePrivacy } from "@wealthfolio/ui";
+import {
+  Button,
+  Skeleton,
+  useAmountFormatting,
+  useBalancePrivacy,
+  useNumberFormatting,
+} from "@wealthfolio/ui";
 
 import type {
   AnalysisTotals,
@@ -11,13 +17,18 @@ import type {
 function ExactMoneyReadout({ summary }: { summary: ExactMoneySummary }) {
   const { t } = useTranslation();
   const { formatAmount } = useAmountFormatting();
+  const { formatDecimal } = useNumberFormatting();
   const { isBalanceHidden } = useBalancePrivacy();
   const amounts = summary.converted ? [summary.converted] : summary.byCurrency;
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap gap-x-2 font-semibold tabular-nums">
         {amounts.length === 0 ? (
-          <span>{isBalanceHidden ? "••••" : t("spending:analysis.noMovement")}</span>
+          <span>
+            {isBalanceHidden
+              ? "••••"
+              : formatDecimal(0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
         ) : (
           amounts.map((total) => (
             <span key={total.currency}>
