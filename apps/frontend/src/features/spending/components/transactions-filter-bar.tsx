@@ -16,6 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
   useBalancePrivacy,
+  useNumberFormatting,
 } from "@wealthfolio/ui";
 
 import { cn } from "@/lib/utils";
@@ -65,7 +66,7 @@ function CurrencyNetPill({ total }: { total: CurrencyNet }) {
  */
 function NetReadout({ label, net }: { label: string; net: NetSummary }) {
   const { isBalanceHidden } = useBalancePrivacy();
-  if (net.byCurrency.length === 0) return null;
+  const { formatDecimal } = useNumberFormatting();
   return (
     // Wraps rather than staying on one line: each currency adds a pill, and
     // from three of them the readout is wider than a phone. It sits under a
@@ -75,6 +76,13 @@ function NetReadout({ label, net }: { label: string; net: NetSummary }) {
     // than inside an amount.
     <span className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
       {label}
+      {net.byCurrency.length === 0 && !net.converted && (
+        <span className="text-foreground font-semibold tabular-nums">
+          {isBalanceHidden
+            ? "••••"
+            : formatDecimal(0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      )}
       {net.converted && (
         <span
           className={cn(
@@ -135,9 +143,9 @@ interface TransactionsFilterBarProps {
   // Count display
   visibleCount: number;
   totalCount: number;
-  /** Net of the checked rows, one entry per currency. Empty hides the readout. */
-  selectedNet: NetSummary;
-  /** Net of the filtered set, one entry per currency. Empty hides the readout. */
+  /** Null means no selection; an empty currency breakdown is a valid zero net. */
+  selectedNet: NetSummary | null;
+  /** Null means unavailable/inactive; an empty currency breakdown is a valid zero net. */
   filteredNet: NetSummary | null;
   isRefreshing: boolean;
   isMobile?: boolean;
@@ -304,9 +312,9 @@ export function TransactionsFilterBar({
         {/* The nets belong on a phone too — arguably more, since the row list
             is harder to scan there. They wrap under the search row rather than
             sitting inline with it. */}
-        {(selectedNet.byCurrency.length > 0 || filteredNet) && (
+        {(selectedNet || filteredNet) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
-            {selectedNet.byCurrency.length > 0 && (
+            {selectedNet && (
               <NetReadout label={t("spending:filters.selectedNet")} net={selectedNet} />
             )}
             {filteredNet && (
@@ -337,9 +345,7 @@ export function TransactionsFilterBar({
         </Button>
       )}
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
-        {selectedNet.byCurrency.length > 0 && (
-          <NetReadout label={t("spending:filters.selectedNet")} net={selectedNet} />
-        )}
+        {selectedNet && <NetReadout label={t("spending:filters.selectedNet")} net={selectedNet} />}
         {filteredNet && <NetReadout label={t("spending:filters.filteredNet")} net={filteredNet} />}
         <span className="text-muted-foreground inline-flex items-center gap-1.5 whitespace-nowrap text-xs tabular-nums">
           {countLabel}

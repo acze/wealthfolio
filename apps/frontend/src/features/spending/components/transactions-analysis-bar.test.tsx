@@ -130,4 +130,84 @@ describe("TransactionsAnalysisBar", () => {
     expect(screen.getByText("0 of 0 matching transactions selected")).toBeVisible();
     expect(screen.getByRole("button", { name: "Select all matching" })).toBeDisabled();
   });
+
+  it.each(["0", "0.00"])(
+    "keeps a nonempty cancelling selection and all zero totals visible (%s)",
+    (amount) => {
+      const money = {
+        byCurrency: [],
+        converted: { currency: "CAD", amount },
+        missingRateCurrencies: [],
+      };
+      const selected = { count: 2, spending: money, cashMovement: money };
+      const excluded = { ...selected, count: 0 };
+      render(
+        <TransactionsAnalysisBar
+          {...props()}
+          analysis={{ matching: selected, selected, excluded }}
+        />,
+      );
+
+      expect(screen.getByRole("region", { name: "Selection analysis" })).toBeVisible();
+      expect(screen.getByText("2 of 2 matching transactions selected")).toBeVisible();
+      expect(screen.getAllByText("0.00 CAD")).toHaveLength(6);
+      expect(screen.getByRole("button", { name: "Clear selection" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Select all matching" })).toBeEnabled();
+    },
+  );
+
+  it("renders native zero without inventing a converted total when cancelled foreign rows lack FX", () => {
+    const nativeZero = { byCurrency: [], converted: null, missingRateCurrencies: ["EUR"] };
+    const totals = { count: 2, spending: nativeZero, cashMovement: nativeZero };
+    render(
+      <TransactionsAnalysisBar
+        {...props()}
+        analysis={{ matching: totals, selected: totals, excluded: { ...totals, count: 0 } }}
+      />,
+    );
+
+    const selected = within(screen.getByTestId("analysis-selected"));
+    expect(selected.getAllByText("0.00")).toHaveLength(2);
+    expect(selected.getAllByText(/missing rates for EUR/)).toHaveLength(2);
+    expect(selected.queryByText(/0\.00 (USD|EUR|CAD)/)).not.toBeInTheDocument();
+    expect(screen.queryByText("No movement")).not.toBeInTheDocument();
+  });
+
+  it("shows zero consumption for a savings selection while retaining its signed cash movement", () => {
+    const selected = {
+      ...total(1, "0", "-75"),
+      spending: { byCurrency: [], converted: null, missingRateCurrencies: [] },
+    };
+    render(<TransactionsAnalysisBar {...props()} analysis={{ ...analysis, selected }} />);
+
+    const readout = within(screen.getByTestId("analysis-selected"));
+    expect(readout.getByText("0.00")).toBeVisible();
+    expect(readout.getByText("-75.00 USD")).toBeVisible();
+    expect(screen.getByText("1 of 151 matching transactions selected")).toBeVisible();
+  });
+
+  it("masks known zero totals without hiding the selection or controls", () => {
+    privacy.isBalanceHidden = true;
+    const money = { byCurrency: [], converted: null, missingRateCurrencies: [] };
+    const totals = { count: 2, spending: money, cashMovement: money };
+    render(
+      <TransactionsAnalysisBar
+        {...props()}
+        analysis={{ matching: totals, selected: totals, excluded: { ...totals, count: 0 } }}
+      />,
+    );
+
+    expect(screen.getByText("2 of 2 matching transactions selected")).toBeVisible();
+    expect(screen.getAllByText("••••")).toHaveLength(6);
+    expect(screen.queryByText("0.00")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear selection" })).toBeEnabled();
+  });
+
+  it("does not turn an absent analysis response into a zero total", () => {
+    render(<TransactionsAnalysisBar {...props()} analysis={undefined} />);
+
+    expect(screen.getByText("Analysis unavailable. No totals are shown.")).toBeVisible();
+    expect(screen.queryByTestId("analysis-selected")).not.toBeInTheDocument();
+    expect(screen.queryByText("0.00")).not.toBeInTheDocument();
+  });
 });

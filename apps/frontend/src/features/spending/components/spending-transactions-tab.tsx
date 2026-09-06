@@ -1186,7 +1186,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           onClearAll={clearAllFilters}
           visibleCount={rows.length}
           totalCount={totalCount}
-          selectedNet={analysisSelection.active ? { byCurrency: [] } : selectedNet}
+          selectedNet={
+            analysisSelection.active || selectedRowIds.size === 0 || isRefreshing || isError
+              ? null
+              : selectedNet
+          }
           filteredNet={analysisSelection.active || isRefreshing || isError ? null : filteredNet}
           isRefreshing={isRefreshing}
           isMobile={isMobile}
