@@ -55,6 +55,7 @@ import { TransactionDayHeader, TransactionDayHeading } from "./transaction-day-h
 import { TransactionRow } from "./transaction-row";
 import { SplitTransactionSheet } from "./split-transaction-sheet";
 import { TransactionsBulkBar } from "./transactions-bulk-bar";
+import { TransactionsAnalysisBar } from "./transactions-analysis-bar";
 import { TransactionsFilterBar, type FilterOption } from "./transactions-filter-bar";
 import type { QuickCategorizeScope } from "./quick-categorize-popover";
 import {
@@ -76,6 +77,10 @@ import {
   type TransactionRowVM,
 } from "../lib/transactions-helpers";
 import { useCashActivitySearch } from "../hooks/use-cash-activity-search";
+import { useCashActivityAnalysis } from "../hooks/use-cash-activity-analysis";
+import { useAnalysisSelection } from "../hooks/use-analysis-selection";
+import { expandCategoryIds } from "../lib/category-rollup";
+import { localDateBoundaryToISOString } from "../lib/timezone";
 import {
   useAssignActivityCategory,
   useBulkAssignCategories,
@@ -456,17 +461,21 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const subcategoriesForFilter = useMemo(() => {
       const all = Array.from(allCategories.values()).filter((c) => !!c.parentId);
       if (selectedCategories.size === 0) return all;
-      return all.filter((c) => c.parentId && selectedCategories.has(c.parentId));
+      const descendants = new Set(expandCategoryIds(selectedCategories, allCategories));
+      return all.filter((c) => descendants.has(c.id));
     }, [allCategories, selectedCategories]);
 
     const expandedCategoryIds = useMemo(() => {
       if (selectedCategories.size === 0) return undefined;
-      const out = new Set<string>(selectedCategories);
-      allCategories.forEach((c) => {
-        if (c.parentId && selectedCategories.has(c.parentId)) out.add(c.id);
-      });
-      return [...out].sort();
+      return expandCategoryIds(selectedCategories, allCategories);
     }, [selectedCategories, allCategories]);
+    const expandedSubcategoryIds = useMemo(
+      () =>
+        selectedSubcategories.size > 0
+          ? expandCategoryIds(selectedSubcategories, allCategories)
+          : undefined,
+      [selectedSubcategories, allCategories],
+    );
 
     const searchRequest: Omit<CashActivitySearchRequest, "offset" | "limit"> = useMemo(() => {
       return {
@@ -474,16 +483,14 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         accountIds: stableArr(selectedAccounts),
         activityTypes: stableArr(selectedTypes),
         categoryIds: expandedCategoryIds,
-        subcategoryIds: stableArr(selectedSubcategories),
+        subcategoryIds: expandedSubcategoryIds,
         eventIds: stableArr(selectedEvents),
         status: statusFilter,
-        startDate: dateRange?.from ? dateRange.from.toISOString() : undefined,
+        startDate: dateRange?.from
+          ? localDateBoundaryToISOString(dateRange.from, "start", appTimezone)
+          : undefined,
         endDate: dateRange?.to
-          ? (() => {
-              const end = new Date(dateRange.to);
-              end.setHours(23, 59, 59, 999);
-              return end.toISOString();
-            })()
+          ? localDateBoundaryToISOString(dateRange.to, "end", appTimezone)
           : undefined,
         minAmount: amountRange.min ?? undefined,
         maxAmount: amountRange.max ?? undefined,
@@ -495,13 +502,19 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       selectedAccounts,
       selectedTypes,
       expandedCategoryIds,
-      selectedSubcategories,
+      expandedSubcategoryIds,
       selectedEvents,
       statusFilter,
       dateRange,
+      appTimezone,
       amountRange,
     ]);
 
+    const categoryFiltersActive = selectedCategories.size > 0 || selectedSubcategories.size > 0;
+    const categoriesFailed =
+      categoryFiltersActive && (spending.isError || income.isError || savings.isError);
+    const categoriesReady =
+      !categoryFiltersActive || (spending.isSuccess && income.isSuccess && savings.isSuccess);
     const {
       items,
       totalCount,
@@ -516,7 +529,26 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       hasNextPage,
       fetchNextPage,
       refetch,
-    } = useCashActivitySearch(searchRequest);
+    } = useCashActivitySearch(searchRequest, { enabled: categoriesReady });
+
+    // Include the immediate input so editing a debounced search cannot leave
+    // the old selection authoritative for another 300ms.
+    const requestKey = JSON.stringify([searchRequest, searchInput.trim()]);
+    const analysisSelection = useAnalysisSelection(
+      requestKey,
+      searchParams.get("analysis") === "true",
+    );
+    const searchPending = debouncedSearch !== searchInput.trim() || !categoriesReady;
+    const analysisQuery = useCashActivityAnalysis(
+      searchRequest,
+      analysisSelection.selection,
+      analysisSelection.active && !searchPending,
+    );
+    const retryCategories = () => {
+      void spending.refetch();
+      void income.refetch();
+      void savings.refetch();
+    };
 
     const accountById = useMemo(() => {
       const m = new Map<string, Account>();
@@ -599,7 +631,6 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       setDateRange(undefined);
     }, []);
 
-    const requestKey = useMemo(() => JSON.stringify(searchRequest), [searchRequest]);
     const [lastRequestKey, setLastRequestKey] = useState(requestKey);
     if (lastRequestKey !== requestKey) {
       setLastRequestKey(requestKey);
@@ -817,41 +848,58 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       setTransferMatchDialog({ open: true, mode: "unlink", row });
     }, []);
 
-    const handleToggleRow = useCallback((id: string) => {
-      setSelectedRowIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-    }, []);
-
-    const allVisibleSelected =
-      rows.length > 0 && rows.every((r) => selectedRowIds.has(r.activity.id));
-    const someVisibleSelected =
-      rows.some((r) => selectedRowIds.has(r.activity.id)) && !allVisibleSelected;
-
-    const daySelectionState = useCallback(
-      (group: TransactionDayGroup): boolean | "indeterminate" => {
-        const selected = group.rows.filter((r) => selectedRowIds.has(r.activity.id)).length;
-        if (selected === 0) return false;
-        return selected === group.rows.length ? true : "indeterminate";
+    const handleToggleRow = useCallback(
+      (id: string) => {
+        if (analysisSelection.active) {
+          analysisSelection.toggle([id]);
+          return;
+        }
+        setSelectedRowIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
       },
-      [selectedRowIds],
+      [analysisSelection],
     );
 
-    const handleToggleDay = useCallback((group: TransactionDayGroup) => {
-      setSelectedRowIds((prev) => {
-        const next = new Set(prev);
-        const allSelected = group.rows.every((r) => next.has(r.activity.id));
-        group.rows.forEach((r) =>
-          allSelected ? next.delete(r.activity.id) : next.add(r.activity.id),
-        );
-        return next;
-      });
-    }, []);
+    const isRowSelected = (id: string) =>
+      analysisSelection.active ? analysisSelection.isSelected(id) : selectedRowIds.has(id);
+
+    const allVisibleSelected = rows.length > 0 && rows.every((r) => isRowSelected(r.activity.id));
+    const someVisibleSelected =
+      rows.some((r) => isRowSelected(r.activity.id)) && !allVisibleSelected;
+
+    const daySelectionState = (group: TransactionDayGroup): boolean | "indeterminate" => {
+      const selected = group.rows.filter((r) => isRowSelected(r.activity.id)).length;
+      if (selected === 0) return false;
+      return selected === group.rows.length ? true : "indeterminate";
+    };
+
+    const handleToggleDay = useCallback(
+      (group: TransactionDayGroup) => {
+        if (analysisSelection.active) {
+          analysisSelection.toggle(group.rows.map((row) => row.activity.id));
+          return;
+        }
+        setSelectedRowIds((prev) => {
+          const next = new Set(prev);
+          const allSelected = group.rows.every((r) => next.has(r.activity.id));
+          group.rows.forEach((r) =>
+            allSelected ? next.delete(r.activity.id) : next.add(r.activity.id),
+          );
+          return next;
+        });
+      },
+      [analysisSelection],
+    );
 
     const toggleSelectAllVisible = () => {
+      if (analysisSelection.active) {
+        analysisSelection.toggle(rows.map((row) => row.activity.id));
+        return;
+      }
       setSelectedRowIds((prev) => {
         const next = new Set(prev);
         if (allVisibleSelected) rows.forEach((r) => next.delete(r.activity.id));
@@ -901,10 +949,10 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       (next: Set<string>) => {
         setSelectedCategories(next);
         setSelectedSubcategories((prev) => {
+          const descendants = new Set(expandCategoryIds(next, allCategories));
           const drop = new Set<string>();
           prev.forEach((id) => {
-            const cat = allCategories.get(id);
-            if (!cat?.parentId || !next.has(cat.parentId)) drop.add(id);
+            if (!descendants.has(id)) drop.add(id);
           });
           if (drop.size === 0) return prev;
           const out = new Set(prev);
@@ -994,7 +1042,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         event: ev ?? null,
         eventTypeColor: ev ? (eventTypeById.get(ev.eventTypeId)?.color ?? null) : null,
         appTimezone,
-        isSelected: selectedRowIds.has(r.activity.id),
+        isSelected: isRowSelected(r.activity.id),
         onToggleSelect: handleToggleRow,
         onAssignCategory: handleAssignCategory,
         onClearCategory: handleClearCategory,
@@ -1038,7 +1086,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               <TransactionCard
                 {...sharedRowProps(item.row)}
                 showAccount={showAccount}
-                selectionMode={selectionMode}
+                selectionMode={selectionMode || analysisSelection.active}
               />
             )}
           </div>
@@ -1138,13 +1186,41 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           onClearAll={clearAllFilters}
           visibleCount={rows.length}
           totalCount={totalCount}
-          selectedNet={selectedNet}
-          filteredNet={filteredNet}
+          selectedNet={analysisSelection.active ? { byCurrency: [] } : selectedNet}
+          filteredNet={analysisSelection.active || isRefreshing || isError ? null : filteredNet}
           isRefreshing={isRefreshing}
           isMobile={isMobile}
         />
 
-        {selectedRowIds.size > 0 && (
+        <TransactionsAnalysisBar
+          active={analysisSelection.active}
+          analysis={analysisQuery.data}
+          pending={
+            !categoriesFailed &&
+            (searchPending || analysisQuery.isPending || analysisQuery.isFetching)
+          }
+          failed={categoriesFailed || analysisQuery.isError}
+          onStart={() => {
+            clearSelection();
+            analysisSelection.start();
+          }}
+          onStop={() => {
+            clearSelection();
+            setSelectionMode(false);
+            analysisSelection.stop();
+          }}
+          onSelectAll={analysisSelection.selectAll}
+          onClear={analysisSelection.clear}
+          onRetry={() => {
+            if (categoriesFailed) {
+              retryCategories();
+            } else {
+              void analysisQuery.refetch();
+            }
+          }}
+        />
+
+        {!analysisSelection.active && selectedRowIds.size > 0 && (
           <TransactionsBulkBar
             selectedCount={selectedRowIds.size}
             categoryScope={bulkCategoryScope}
@@ -1155,20 +1231,23 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           />
         )}
 
-        {isLoading ? (
+        {isLoading || (!categoriesReady && !categoriesFailed) ? (
           <div className="space-y-2">
             <Skeleton className="h-12" />
             <Skeleton className="h-12" />
             <Skeleton className="h-12" />
           </div>
-        ) : isError && !isFetchNextPageError ? (
+        ) : categoriesFailed || (isError && !isFetchNextPageError) ? (
           <EmptyPlaceholder>
             <EmptyPlaceholder.Icon name="AlertTriangle" />
             <EmptyPlaceholder.Title>{t("spending:txTab.loadErrorTitle")}</EmptyPlaceholder.Title>
             <EmptyPlaceholder.Description>
               {error?.message ?? t("spending:txTab.tryRefreshing")}
             </EmptyPlaceholder.Description>
-            <Button variant="outline" onClick={() => void refetch()}>
+            <Button
+              variant="outline"
+              onClick={() => (categoriesFailed ? retryCategories() : void refetch())}
+            >
               {t("common:retry")}
             </Button>
           </EmptyPlaceholder>
@@ -1192,15 +1271,17 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           </EmptyPlaceholder>
         ) : isMobile ? (
           <div className="spending-activity-list space-y-2">
-            <SelectionToolbar
-              rowCount={rows.length}
-              selectionMode={selectionMode}
-              onEnterSelectionMode={() => setSelectionMode(true)}
-              onExitSelectionMode={exitSelectionMode}
-              allVisibleSelected={allVisibleSelected}
-              someVisibleSelected={someVisibleSelected}
-              onToggleSelectAllVisible={toggleSelectAllVisible}
-            />
+            {!analysisSelection.active && (
+              <SelectionToolbar
+                rowCount={rows.length}
+                selectionMode={selectionMode}
+                onEnterSelectionMode={() => setSelectionMode(true)}
+                onExitSelectionMode={exitSelectionMode}
+                allVisibleSelected={allVisibleSelected}
+                someVisibleSelected={someVisibleSelected}
+                onToggleSelectAllVisible={toggleSelectAllVisible}
+              />
+            )}
             {/* `overflow-anchor: none` keeps the browser from picking a row
                 inside here as its scroll anchor: rows are recycled as you
                 scroll, and re-anchoring to one that just changed height fights

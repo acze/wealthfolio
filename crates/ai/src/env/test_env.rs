@@ -1563,6 +1563,7 @@ impl CashActivityServiceTrait for MockCashActivityService {
                 total_count,
                 net: None,
                 base_currency: None,
+                analysis: None,
             },
         )
     }

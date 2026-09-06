@@ -49,7 +49,7 @@ pub enum SortDirection {
 }
 
 /// Search request for cash activities. Powers the spending Transactions page.
-/// All filters optional. Server-side: filters → sort → paginate → join assignments.
+/// All filters optional. Server-side: filters → sort → analysis → paginate → join assignments.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CashActivitySearchRequest {
@@ -85,10 +85,89 @@ pub struct CashActivitySearchRequest {
     pub offset: usize,
     #[serde(default = "default_limit")]
     pub limit: usize,
+    /// Optional analysis of the full filtered set, independent of pagination.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<CashActivitySelection>,
 }
 
 fn default_limit() -> usize {
     50
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CashActivitySelectionMode {
+    All,
+    Explicit,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CashActivitySelection {
+    pub mode: CashActivitySelectionMode,
+    /// Excluded ids in `all` mode; included ids in `explicit` mode.
+    /// Unknown ids and ids outside the filtered set have no effect.
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExactCurrencyAmount {
+    pub currency: String,
+    pub amount: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExactMoneySummary {
+    /// Exact native totals. Currencies that net to zero are omitted.
+    pub by_currency: Vec<ExactCurrencyAmount>,
+    /// Sum of per-row conversions, including native-zero FX residuals.
+    /// Present whenever a base was supplied and every contribution converted.
+    pub converted: Option<ExactCurrencyAmount>,
+    /// Nonzero contributions without a rate, even if their native totals cancel.
+    pub missing_rate_currencies: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisTotals {
+    pub count: usize,
+    /// Canonical signed cash movement of whole transactions.
+    pub cash_movement: ExactMoneySummary,
+    /// Net consumption, restricted to matching category allocations when filtered.
+    pub spending: ExactMoneySummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CashActivityAnalysis {
+    pub matching: AnalysisTotals,
+    pub selected: AnalysisTotals,
+    pub excluded: AnalysisTotals,
+}
+
+impl CashActivityAnalysis {
+    pub fn empty(base_currency: Option<&str>) -> Self {
+        let money = ExactMoneySummary {
+            by_currency: Vec::new(),
+            converted: base_currency.map(|currency| ExactCurrencyAmount {
+                currency: currency.to_string(),
+                amount: "0".to_string(),
+            }),
+            missing_rate_currencies: Vec::new(),
+        };
+        let totals = AnalysisTotals {
+            count: 0,
+            cash_movement: money.clone(),
+            spending: money,
+        };
+        Self {
+            matching: totals.clone(),
+            selected: totals.clone(),
+            excluded: totals,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -207,4 +286,7 @@ pub struct CashActivitySearchResponse {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_currency: Option<String>,
+    /// Requested selection totals over the full filtered snapshot, before pagination.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub analysis: Option<CashActivityAnalysis>,
 }

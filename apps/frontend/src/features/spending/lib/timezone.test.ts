@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { addCalendarMonths, getZonedDateParts, zonedCalendarDateBoundaryToDate } from "./timezone";
+import {
+  addCalendarMonths,
+  formatZonedDateKey,
+  getZonedDateParts,
+  localDateBoundaryToISOString,
+  zonedCalendarDateBoundaryToDate,
+} from "./timezone";
 
 describe("spending timezone helpers", () => {
   it("converts configured timezone day boundaries to UTC instants", () => {
@@ -36,4 +42,23 @@ describe("spending timezone helpers", () => {
       day: 28,
     });
   });
+
+  it.each([
+    ["Asia/Tokyo", "2026-05-31T15:00:00.000Z", "2026-06-30T14:59:59.999Z"],
+    ["America/Toronto", "2026-03-08T05:00:00.000Z", "2026-03-09T03:59:59.999Z"],
+  ])(
+    "keeps drawer-to-Transactions calendar links in %s, independent of the device timezone",
+    (timezone, start, end) => {
+      const parseCalendarParam = (instant: string) => {
+        const [year, month, day] = formatZonedDateKey(new Date(instant), timezone)
+          .split("-")
+          .map(Number);
+        return new Date(year, month - 1, day);
+      };
+      expect(localDateBoundaryToISOString(parseCalendarParam(start), "start", timezone)).toBe(
+        start,
+      );
+      expect(localDateBoundaryToISOString(parseCalendarParam(end), "end", timezone)).toBe(end);
+    },
+  );
 });

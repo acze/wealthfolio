@@ -16,6 +16,30 @@ export interface RollupMeta {
   parentId?: string | null;
 }
 
+/** Include each selected category and every descendant, even for nested parents. */
+export function expandCategoryIds(
+  ids: Iterable<string>,
+  categories: Map<string, RollupMeta>,
+): string[] {
+  const children = new Map<string, string[]>();
+  for (const [id, category] of categories) {
+    if (!category.parentId) continue;
+    const siblings = children.get(category.parentId) ?? [];
+    siblings.push(id);
+    children.set(category.parentId, siblings);
+  }
+
+  const expanded = new Set<string>();
+  const pending = Array.from(ids);
+  while (pending.length > 0) {
+    const id = pending.pop()!;
+    if (expanded.has(id)) continue;
+    expanded.add(id);
+    for (const childId of children.get(id) ?? []) pending.push(childId);
+  }
+  return Array.from(expanded).sort();
+}
+
 /** Maximum chain depth to walk. Real taxonomies are 2 levels (top + sub);
  *  the cap guards against a corrupted meta map with cyclic parent_id chains. */
 const MAX_PARENT_DEPTH = 32;

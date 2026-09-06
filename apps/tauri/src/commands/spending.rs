@@ -16,7 +16,8 @@ use wealthfolio_spending::budget::{
     BudgetSnapshot, NewBudgetGroup, NewBudgetRolloverSetting, NewBudgetTarget, UpdateBudgetGroup,
 };
 use wealthfolio_spending::cash_activities::{
-    CashActivity, CashActivityFilter, CashActivitySearchRequest, CashActivitySearchResponse,
+    CashActivity, CashActivityAnalysis, CashActivityFilter, CashActivitySearchRequest,
+    CashActivitySearchResponse,
 };
 use wealthfolio_spending::categorization_rules::{
     CategorizationRule, CategorizationRulesService, ImportPresetResult, NewCategorizationRule,
@@ -150,23 +151,28 @@ pub async fn search_cash_activities(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<CashActivitySearchResponse, String> {
     debug!("Searching cash activities...");
+    let request = request.unwrap_or_default();
     if !spending_enabled(&state).await? {
+        let base_currency = request
+            .selection
+            .as_ref()
+            .map(|_| state.get_base_currency());
         return Ok(CashActivitySearchResponse {
             items: Vec::new(),
             total_count: 0,
             net: Some(Default::default()),
-            base_currency: None,
+            analysis: request
+                .selection
+                .as_ref()
+                .map(|_| CashActivityAnalysis::empty(base_currency.as_deref())),
+            base_currency,
         });
     }
     let base_currency = state.get_base_currency();
     let timezone = state.get_timezone();
     state
         .cash_activity_service()
-        .search(
-            request.unwrap_or_default(),
-            Some(base_currency.as_str()),
-            &timezone,
-        )
+        .search(request, Some(base_currency.as_str()), &timezone)
         .await
         .map_err(|e| format!("Failed to search cash activities: {}", e))
 }

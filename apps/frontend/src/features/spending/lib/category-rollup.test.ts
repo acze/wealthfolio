@@ -1,6 +1,76 @@
 import { describe, expect, it } from "vitest";
 
-import { SAVINGS_ROW_ID, buildWhereItWentRows, type CategoryMeta } from "./category-rollup";
+import {
+  SAVINGS_ROW_ID,
+  buildWhereItWentRows,
+  expandCategoryIds,
+  type CategoryMeta,
+  type RollupMeta,
+} from "./category-rollup";
+
+describe("expandCategoryIds", () => {
+  const categories = new Map<string, RollupMeta>([
+    ["food", {}],
+    ["groceries", { parentId: "food" }],
+    ["produce", { parentId: "groceries" }],
+    ["fruit", { parentId: "produce" }],
+    ["travel", {}],
+    ["flights", { parentId: "travel" }],
+  ]);
+
+  it("includes every descendant of a parent, in sorted order", () => {
+    expect(expandCategoryIds(["food"], categories)).toEqual([
+      "food",
+      "fruit",
+      "groceries",
+      "produce",
+    ]);
+  });
+
+  it("expands a nested subparent without including its ancestors or siblings", () => {
+    expect(expandCategoryIds(["produce"], categories)).toEqual(["fruit", "produce"]);
+  });
+
+  it("deduplicates overlapping roots and accepts any iterable", () => {
+    expect(expandCategoryIds(new Set(["travel", "groceries", "food"]), categories)).toEqual([
+      "flights",
+      "food",
+      "fruit",
+      "groceries",
+      "produce",
+      "travel",
+    ]);
+    expect(expandCategoryIds(["food", "food", "fruit"], categories)).toEqual(
+      expandCategoryIds(["food"], categories),
+    );
+  });
+
+  it("terminates cycles and self-parent links while retaining attached descendants", () => {
+    const cyclic = new Map<string, RollupMeta>([
+      ["a", { parentId: "c" }],
+      ["b", { parentId: "a" }],
+      ["c", { parentId: "b" }],
+      ["leaf", { parentId: "b" }],
+      ["self", { parentId: "self" }],
+    ]);
+    expect(expandCategoryIds(["c", "self", "a"], cyclic)).toEqual(["a", "b", "c", "leaf", "self"]);
+  });
+
+  it("retains unknown roots, including children whose parent metadata is missing", () => {
+    expect(
+      expandCategoryIds(["missing", "unknown"], new Map([["child", { parentId: "missing" }]])),
+    ).toEqual(["child", "missing", "unknown"]);
+    expect(expandCategoryIds([], categories)).toEqual([]);
+  });
+
+  it("does not truncate deeper-than-usual taxonomies", () => {
+    const deep = new Map<string, RollupMeta>();
+    for (let index = 0; index < 100; index++) {
+      deep.set(`node-${index}`, { parentId: index ? `node-${index - 1}` : null });
+    }
+    expect(expandCategoryIds(["node-0"], deep)).toEqual(Array.from(deep.keys()).sort());
+  });
+});
 
 const meta = (overrides: Record<string, CategoryMeta> = {}) =>
   new Map<string, CategoryMeta>([
