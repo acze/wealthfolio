@@ -4,7 +4,8 @@ import { BASE_URL, completeOnboardingIfNeeded, gotoAppPath } from "./helpers";
 
 const SEARCH_PATH = "/api/v1/spending/cash-activities/search";
 const TAXONOMY = "spending_categories";
-const COUNT = 125;
+const COUNT = 127;
+const CATEGORIZED_COUNT = COUNT - 3;
 const SPENDING = "2176.69";
 const CASH_MOVEMENT = "-2151.69";
 
@@ -24,6 +25,11 @@ interface SearchResult {
   items: { id: string; notes: string; cashFlowBucket: string }[];
   totalCount: number;
   analysis: { selected: Totals; matching: Totals; excluded: Totals };
+  selectionSnapshot?: {
+    ids: string[];
+    net: { byCurrency: { currency: string; amount: number }[]; converted: unknown };
+    cashFlowBuckets: string[];
+  };
 }
 
 test.describe.configure({ mode: "serial" });
@@ -37,6 +43,8 @@ test.describe("Spending selection analysis with real paginated transactions", ()
   let grandchildId: string;
   let outlierId: string;
   let firstExpenseId: string;
+  let ordinaryIds: string[];
+  let zeroCurrencyIds: string[];
   const token = randomUUID().slice(0, 8);
   const parentName = `Analysis parent ${token}`;
   const childName = `Analysis child ${token}`;
@@ -45,6 +53,7 @@ test.describe("Spending selection analysis with real paginated transactions", ()
   const otherAccountName = `Analysis other ${token}`;
   const outlierNote = `Synthetic outlier ${token}`;
   const ordinaryNote = `Synthetic ordinary ${token}`;
+  const zeroCurrencyNote = `Synthetic zero currency ${token}`;
   const day = new Date().toISOString().slice(0, 10);
   const monthStart = `${day.slice(0, 7)}-01`;
   const monthEnd = new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0))
@@ -81,6 +90,27 @@ test.describe("Spending selection analysis with real paginated transactions", ()
   }
 
   const region = () => page.getByRole("region", { name: "Selection analysis", exact: true });
+  const bulkRegion = () => page.getByRole("region", { name: "Bulk actions", exact: true });
+  const selectedNet = () => page.locator("span").filter({ hasText: /^Selected net/ });
+
+  function observeLedgerWrites() {
+    const writes: string[] = [];
+    const record = (request: import("@playwright/test").Request) => {
+      const path = new URL(request.url()).pathname;
+      if (
+        ["POST", "PUT", "DELETE", "PATCH"].includes(request.method()) &&
+        ((path.startsWith("/api/v1/activities") && path !== "/api/v1/activities/search") ||
+          /^\/api\/v1\/spending\/(?:assignments|activities)\//.test(path))
+      ) {
+        writes.push(`${request.method()} ${path}`);
+      }
+    };
+    page.on("request", record);
+    return () => {
+      page.off("request", record);
+      return writes;
+    };
+  }
 
   async function expectCount(selected: number, matching = COUNT) {
     await expect(region()).toContainText(
@@ -114,16 +144,35 @@ test.describe("Spending selection analysis with real paginated transactions", ()
 
   async function scrollToOutlier(): Promise<Locator> {
     const row = page.getByRole("row").filter({ hasText: outlierNote });
+    await page.evaluate(() => {
+      for (const el of document.querySelectorAll<HTMLElement>(
+        "[data-virtual-scroll-parent],[data-page-scroll-container]",
+      )) {
+        if (el.scrollHeight > el.clientHeight) el.scrollTo(0, 0);
+      }
+    });
     // Scroll the real virtualized list; no DOM injection or API-only exclusion.
     await expect
       .poll(
         async () => {
-          if (await row.isVisible()) return true;
+          const inViewport = await page.evaluate((note) => {
+            const target = [...document.querySelectorAll("tr")].find((el) =>
+              el.textContent?.includes(note),
+            );
+            if (!target) return false;
+            const bounds = target.getBoundingClientRect();
+            const stickyBottom =
+              document
+                .querySelector('section[aria-label="Selection analysis"]')
+                ?.getBoundingClientRect().bottom ?? 0;
+            return bounds.top > Math.max(0, stickyBottom) && bounds.bottom < window.innerHeight;
+          }, outlierNote);
+          if (inViewport) return true;
           await page.evaluate(() => {
             for (const el of document.querySelectorAll<HTMLElement>(
               "[data-virtual-scroll-parent],[data-page-scroll-container]",
             )) {
-              if (el.scrollHeight > el.clientHeight) el.scrollBy(0, 520);
+              if (el.scrollHeight > el.clientHeight) el.scrollBy(0, 260);
             }
           });
           return false;
@@ -131,7 +180,6 @@ test.describe("Spending selection analysis with real paginated transactions", ()
         { timeout: 30000, intervals: [100, 200, 300] },
       )
       .toBe(true);
-    await row.scrollIntoViewIfNeeded();
     return row;
   }
 
@@ -196,19 +244,35 @@ test.describe("Spending selection analysis with real paginated transactions", ()
       metadata: JSON.stringify({ flow: { is_external: true } }),
     });
     const income = activity(`Synthetic income ${token}`, "200.00", "DEPOSIT");
+    const zeroCurrency = [
+      activity(`${zeroCurrencyNote} purchase`, "12.50", "WITHDRAWAL", {
+        currency: "EUR",
+        fxRate: "2",
+        activityDate: `${day}T09:00:00Z`,
+      }),
+      activity(`${zeroCurrencyNote} refund`, "12.50", "CREDIT", {
+        currency: "EUR",
+        fxRate: "2",
+        activityDate: `${day}T09:01:00Z`,
+        subtype: "REFUND",
+        metadata: JSON.stringify({ flow: { is_external: true } }),
+      }),
+    ];
     const sentinel = activity(`Other account sentinel ${token}`, "42.42", "WITHDRAWAL", {
       accountId: otherAccountId,
     });
     const result = await api<{ created: { id: string; notes: string }[]; errors: unknown[] }>(
       "/activities/bulk",
       {
-        creates: [...ordinary, outlier, refund, income, sentinel],
+        creates: [...ordinary, outlier, refund, income, sentinel, ...zeroCurrency],
       },
     );
     expect(result.errors).toEqual([]);
-    expect(result.created).toHaveLength(124);
+    expect(result.created).toHaveLength(126);
     const persistedIds = new Map(result.created.map((row) => [row.notes, row.id]));
     firstExpenseId = persistedIds.get(ordinary[0].notes)!;
+    ordinaryIds = ordinary.map((row) => persistedIds.get(row.notes)!);
+    zeroCurrencyIds = zeroCurrency.map((row) => persistedIds.get(row.notes)!);
     outlierId = persistedIds.get(outlier.notes)!;
     for (const [toAccountId, amount, note] of [
       [investmentId, "75.00", "saving"],
@@ -227,16 +291,27 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     }
     await api(
       "/spending/assignments/bulk",
-      [...ordinary, outlier, refund].map((row, index) => ({
+      [...ordinary, outlier, refund, ...zeroCurrency].map((row, index) => ({
         activityId: persistedIds.get(row.notes)!,
         taxonomyId: TAXONOMY,
         categoryId: [parentId, childId, grandchildId][index % 3],
       })),
     );
-    const response = await search({ limit: 50, sortBy: "date", sortDir: "desc" });
+    const response = await search({
+      limit: 50,
+      sortBy: "date",
+      sortDir: "desc",
+      includeSelectionSnapshot: true,
+    });
     expect(response.totalCount).toBe(COUNT);
     expect(response.items).toHaveLength(50);
     expect(response.items.some((item) => item.id === outlierId)).toBe(false);
+    expect(response.items.some((item) => zeroCurrencyIds.includes(item.id))).toBe(false);
+    expect(response.selectionSnapshot?.ids).toHaveLength(COUNT);
+    expect(response.selectionSnapshot?.net.byCurrency).toContainEqual({
+      currency: "EUR",
+      amount: 0,
+    });
     expect(response.analysis.matching.count).toBe(COUNT);
     assertNative(response.analysis.matching.spending, SPENDING);
     assertNative(response.analysis.matching.cashMovement, CASH_MOVEMENT);
@@ -249,27 +324,17 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await page?.close();
   });
 
-  test("selects every matching page, excludes a late outlier with Space, and keeps bulk editing separate", async ({}, testInfo) => {
+  test("preserves selection across modes, including all pages and unloaded zero-currency rows", async ({}, testInfo) => {
     test.setTimeout(90000);
+    const finishWriteObservation = observeLedgerWrites();
     await gotoAppPath(page, activitiesPath({ analysis: "false" }));
     const firstExpense = page.getByRole("row").filter({ hasText: `${ordinaryNote} 000` });
     await firstExpense.getByRole("checkbox").click();
     await expect(page.getByRole("region", { name: "Bulk actions" })).toContainText("1 selected");
     await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
-    await expectCount(0);
+    await expectCount(1);
+    await expect(firstExpense.getByRole("checkbox")).toBeChecked();
     await expect(page.getByRole("region", { name: "Bulk actions" })).toHaveCount(0);
-    const writes: string[] = [];
-    const recordWrites = (request: import("@playwright/test").Request) => {
-      if (
-        ["POST", "PUT", "DELETE", "PATCH"].includes(request.method()) &&
-        /\/api\/v1\/(?:activities(?:$|\/bulk$|\/transfer-pair$)|spending\/(?:assignments|activities)\/)/.test(
-          request.url(),
-        )
-      ) {
-        writes.push(request.url());
-      }
-    };
-    page.on("request", recordWrites);
     await page
       .getByRole("checkbox", { name: "Select all visible transactions", exact: true })
       .click();
@@ -278,6 +343,33 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await expectCount(COUNT);
     await expectMoney("matching", SPENDING, CASH_MOVEMENT);
     await expectMoney("selected", SPENDING, CASH_MOVEMENT);
+
+    await expect(page.getByText(`50/${COUNT} transactions`, { exact: true })).toBeVisible();
+    const materialized = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(SEARCH_PATH) &&
+        response.request().postDataJSON().includeSelectionSnapshot === true,
+    );
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText(`${COUNT} selected`);
+    await expect(bulkRegion()).toContainText("Includes selected transactions on other pages.");
+    const snapshot = ((await (await materialized).json()) as SearchResult).selectionSnapshot!;
+    expect(snapshot.ids).toHaveLength(COUNT);
+    expect(snapshot.ids).toEqual(expect.arrayContaining(zeroCurrencyIds));
+    expect(snapshot.net.byCurrency).toContainEqual({ currency: "EUR", amount: 0 });
+    await expect(selectedNet().getByText("EUR", { exact: true }).locator("..")).toContainText(
+      "0.00",
+    );
+    await expect(selectedNet()).toContainText("2,151.69");
+    await expect(selectedNet().getByText("EUR", { exact: true }).locator("..")).toHaveClass(
+      /rounded-full/,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("normal-all-matching-unloaded-eur-zero.png"),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(COUNT);
 
     const outlier = await scrollToOutlier();
     const checkbox = outlier.getByRole("checkbox");
@@ -295,10 +387,19 @@ test.describe("Spending selection analysis with real paginated transactions", ()
       fullPage: true,
     });
     const exact = await search({ selection: { mode: "all", ids: [outlierId] } });
-    expect(exact.analysis.selected.count).toBe(124);
+    expect(exact.analysis.selected.count).toBe(COUNT - 1);
     expect(exact.analysis.excluded.count).toBe(1);
     assertNative(exact.analysis.selected.spending, "1175.70");
     assertNative(exact.analysis.selected.cashMovement, "-1150.70");
+
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText(`${COUNT - 1} selected`);
+    await scrollToOutlier();
+    await expect(outlier.getByRole("checkbox")).not.toBeChecked();
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(COUNT - 1);
+    await scrollToOutlier();
+    await expect(outlier.getByRole("checkbox")).not.toBeChecked();
 
     await region().getByRole("button", { name: "Clear selection" }).click();
     await expectCount(0);
@@ -306,8 +407,7 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await region().getByRole("button", { name: "Exit analysis" }).click();
     await expect(region()).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Bulk actions" })).toHaveCount(0);
-    page.off("request", recordWrites);
-    expect(writes).toEqual([]);
+    expect(finishWriteObservation()).toEqual([]);
     // A subsequent ordinary bulk action must contain one explicit row, never
     // the implicit all-matching analysis selection.
     await gotoAppPath(page, activitiesPath({ analysis: "false", q: `${ordinaryNote} 000` }));
@@ -344,9 +444,9 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await page.getByRole("button", { name: /^Category/ }).click();
     await page.getByRole("option", { name: parentName, exact: true }).click();
     await page.keyboard.press("Escape");
-    await expectCount(0, 122);
+    await expectCount(0, CATEGORIZED_COUNT);
     await region().getByRole("button", { name: "Select all matching" }).click();
-    await expectCount(122, 122);
+    await expectCount(CATEGORIZED_COUNT, CATEGORIZED_COUNT);
     await expectMoney("matching", SPENDING, "-2176.69");
     await page.getByRole("button", { name: "Clear all", exact: true }).click();
     const all = await search({ accountIds: undefined, startDate: undefined, endDate: undefined });
@@ -366,6 +466,166 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await expectCount(0, 0);
     await expect(region().getByRole("button", { name: "Select all matching" })).toBeDisabled();
     await expect(page.getByTestId("analysis-selected")).not.toContainText("57.58");
+  });
+
+  test("keeps explicit zero-sum selections and Analysis edits through repeated transitions", async () => {
+    await gotoAppPath(page, activitiesPath({ analysis: "false", q: zeroCurrencyNote }));
+    const purchase = page.getByRole("row").filter({ hasText: `${zeroCurrencyNote} purchase` });
+    const refund = page.getByRole("row").filter({ hasText: `${zeroCurrencyNote} refund` });
+    await purchase.getByRole("checkbox").click();
+    await expect(bulkRegion()).toContainText("1 selected");
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(1, 2);
+    await expect(purchase.getByRole("checkbox")).toBeChecked();
+    await refund.getByRole("checkbox").click();
+    await expectCount(2, 2);
+    await expectMoney("selected", "0", "0");
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("2 selected");
+    await expect(selectedNet().getByText("EUR", { exact: true }).locator("..")).toContainText(
+      "0.00",
+    );
+    await expect(purchase.getByRole("checkbox")).toBeChecked();
+    await expect(refund.getByRole("checkbox")).toBeChecked();
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(2, 2);
+    await purchase.getByRole("checkbox").click();
+    await expectCount(1, 2);
+    for (let turn = 0; turn < 2; turn++) {
+      await region().getByRole("button", { name: "Exit analysis" }).click();
+      await expect(bulkRegion()).toContainText("1 selected");
+      await expect(purchase.getByRole("checkbox")).not.toBeChecked();
+      await expect(refund.getByRole("checkbox")).toBeChecked();
+      await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+      await expectCount(1, 2);
+    }
+    await region().getByRole("button", { name: "Clear selection" }).click();
+    await expectCount(0, 2);
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toHaveCount(0);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(0, 2);
+  });
+
+  test("submits exactly the full resolved selection and resets it on normal-mode filter changes", async () => {
+    await gotoAppPath(page, activitiesPath({ q: ordinaryNote }));
+    await expectCount(0, 120);
+    await region().getByRole("button", { name: "Select all matching" }).click();
+    await expectCount(120, 120);
+    await page
+      .getByRole("row")
+      .filter({ hasText: `${ordinaryNote} 000` })
+      .getByRole("checkbox")
+      .click();
+    await expectCount(119, 120);
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("119 selected");
+    await bulkRegion().getByRole("button", { name: "Categorize", exact: true }).click();
+    const mutation = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/spending/assignments/bulk") && request.method() === "POST",
+    );
+    await page.getByRole("option", { name: parentName, exact: true }).click();
+    const submitted = (await mutation).postDataJSON() as { activityId: string }[];
+    expect(submitted).toHaveLength(119);
+    expect(submitted.map((entry) => entry.activityId).sort()).toEqual(
+      ordinaryIds.filter((id) => id !== firstExpenseId).sort(),
+    );
+    await expect(bulkRegion()).toHaveCount(0);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(0, 120);
+    await region().getByRole("button", { name: "Select all matching" }).click();
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("120 selected");
+    await page
+      .getByPlaceholder(/search/i)
+      .first()
+      .fill(outlierNote);
+    await expect(bulkRegion()).toHaveCount(0);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(0, 1);
+  });
+
+  test("blocks bulk actions during materialization and ignores late IDs after toggles or clear", async () => {
+    const finishWriteObservation = observeLedgerWrites();
+    await gotoAppPath(page, activitiesPath());
+    await expectCount(0);
+    await region().getByRole("button", { name: "Select all matching" }).click();
+    await expectCount(COUNT);
+    let release: () => void = () => {};
+    let held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let behavior: "hold" | "error" | "pass" = "hold";
+    await page.route(`**${SEARCH_PATH}`, async (route) => {
+      if (!route.request().postDataJSON().includeSelectionSnapshot) {
+        await route.continue();
+      } else if (behavior === "error") {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: '{"error":"Synthetic selection snapshot failure"}',
+        });
+      } else {
+        if (behavior === "hold") await held;
+        await route.continue();
+      }
+    });
+    const lateResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(SEARCH_PATH) &&
+        response.request().postDataJSON().includeSelectionSnapshot === true,
+    );
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("Preparing selected transactions...");
+    await expect(bulkRegion().getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(COUNT);
+    release();
+    await (await lateResponse).finished();
+    await expect(bulkRegion()).toHaveCount(0);
+    await expectCount(COUNT);
+    await page
+      .getByRole("row")
+      .filter({ hasText: `${ordinaryNote} 000` })
+      .getByRole("checkbox")
+      .click();
+    await expectCount(COUNT - 1);
+    behavior = "error";
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("Your selection is preserved.");
+    await expect(bulkRegion().getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(COUNT - 1);
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("Your selection is preserved.");
+    behavior = "pass";
+    await bulkRegion().getByRole("button", { name: "Retry" }).click();
+    await expect(bulkRegion()).toContainText(`${COUNT - 1} selected`);
+    await expect(bulkRegion().getByRole("button", { name: "Delete", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(COUNT - 1);
+    await region().getByRole("button", { name: "Select all matching" }).click();
+    await expectCount(COUNT);
+    held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    behavior = "hold";
+    const clearedResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(SEARCH_PATH) &&
+        response.request().postDataJSON().includeSelectionSnapshot === true,
+    );
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("Preparing selected transactions...");
+    await bulkRegion().getByRole("button", { name: "Clear", exact: true }).click();
+    release();
+    await (await clearedResponse).finished();
+    await expect(bulkRegion()).toHaveCount(0);
+    await page.unroute(`**${SEARCH_PATH}`);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(0);
+    expect(finishWriteObservation()).toEqual([]);
   });
 
   test("hides stale totals while a real read is pending or fails and recovers", async () => {
@@ -432,6 +692,13 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await expectCount(COUNT);
     await expectMoney("selected", SPENDING, CASH_MOVEMENT);
     await expect(region().getByRole("button", { name: "Exit analysis" })).toBeInViewport();
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText(`${COUNT} selected`);
+    await expect(selectedNet().getByText("EUR", { exact: true }).locator("..")).toContainText(
+      "0.00",
+    );
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(COUNT);
     const widths = await page.evaluate(() => ({
       document: document.documentElement.scrollWidth,
       viewport: window.innerWidth,
@@ -468,10 +735,10 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await page.getByRole("row").filter({ hasText: parentName }).click();
     const drawer = page.getByRole("dialog");
     await expect(drawer).toBeVisible();
-    await expect(drawer).toContainText("122 total");
+    await expect(drawer).toContainText(`${CATEGORIZED_COUNT} total`);
     await expect(drawer.getByRole("status")).toContainText("2,176.69");
     await drawer.getByRole("button", { name: /Load \d+ more/ }).click();
-    await expect(drawer).toContainText("122 total");
+    await expect(drawer).toContainText(`${CATEGORIZED_COUNT} total`);
     await expect(drawer.getByRole("status")).toContainText("2,176.69");
     await page.screenshot({
       path: testInfo.outputPath("desktop-category-drawer.png"),
@@ -487,9 +754,9 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     expect(params.get("to")).toBe(monthEnd);
     expect(params.get("accounts")?.split(",").sort()).toEqual([accountId, otherAccountId].sort());
     await link.click();
-    await expectCount(0, 122);
+    await expectCount(0, CATEGORIZED_COUNT);
     await region().getByRole("button", { name: "Select all matching" }).click();
-    await expectCount(122, 122);
+    await expectCount(CATEGORIZED_COUNT, CATEGORIZED_COUNT);
     await expectMoney("selected", SPENDING, "-2176.69");
     await page.goBack();
     await expect(page).toHaveURL(/\/spending\/insights/);

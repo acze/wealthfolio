@@ -21,7 +21,7 @@ export function toggleAnalysisRows(
   return { mode: selection.mode, ids: [...next].sort() };
 }
 
-/** Separate from edit selection: an implicit set must never reach a mutation. */
+/** Modes share the logical selection; mutations require a server-resolved ID snapshot. */
 export function useAnalysisSelection(scope: string, initiallyActive = false) {
   const [state, setState] = useState(() => ({
     scope,
@@ -35,14 +35,14 @@ export function useAnalysisSelection(scope: string, initiallyActive = false) {
   return {
     active: state.active,
     selection,
-    start: () => setState({ scope, active: true, selection: EMPTY_ANALYSIS_SELECTION }),
-    stop: () => setState({ scope, active: false, selection: EMPTY_ANALYSIS_SELECTION }),
-    clear: () => setState({ scope, active: true, selection: EMPTY_ANALYSIS_SELECTION }),
-    selectAll: () => setState({ scope, active: true, selection: { mode: "all", ids: [] } }),
+    start: () => setState((prev) => ({ ...prev, active: true })),
+    stop: () => setState((prev) => ({ ...prev, active: false })),
+    clear: () => setState((prev) => ({ ...prev, selection: EMPTY_ANALYSIS_SELECTION })),
+    selectAll: () => setState((prev) => ({ ...prev, selection: { mode: "all", ids: [] } })),
     toggle: (ids: string[]) =>
       setState((prev) => ({
         scope,
-        active: true,
+        active: prev.active,
         selection: toggleAnalysisRows(
           prev.scope === scope ? prev.selection : EMPTY_ANALYSIS_SELECTION,
           ids,

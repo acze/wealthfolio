@@ -72,13 +72,13 @@ import {
   toRowVM,
   groupRowsByDay,
   flattenDayGroups,
-  netSummary,
   withKnownNetCurrencies,
   type TransactionDayGroup,
   type TransactionRowVM,
 } from "../lib/transactions-helpers";
 import { useCashActivitySearch } from "../hooks/use-cash-activity-search";
 import { useCashActivityAnalysis } from "../hooks/use-cash-activity-analysis";
+import { useCashActivitySelectionSnapshot } from "../hooks/use-cash-activity-selection-snapshot";
 import { useAnalysisSelection } from "../hooks/use-analysis-selection";
 import { expandCategoryIds } from "../lib/category-rollup";
 import { localDateBoundaryToISOString } from "../lib/timezone";
@@ -381,7 +381,6 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       setSearchParams,
     ]);
 
-    const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
     /**
      * Mobile only. The card list hides its checkboxes until the user asks to
      * select, the way a phone list normally does — a checkbox on every row is a
@@ -520,7 +519,6 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       items,
       totalCount,
       net,
-      baseCurrency,
       isLoading,
       isFetching,
       isFetchingNextPage,
@@ -545,6 +543,29 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       analysisSelection.selection,
       analysisSelection.active && !searchPending,
     );
+    const hasSelection =
+      analysisSelection.selection.mode === "all" || analysisSelection.selection.ids.length > 0;
+    const selectionSnapshotQuery = useCashActivitySelectionSnapshot(
+      searchRequest,
+      analysisSelection.selection,
+      !analysisSelection.active && hasSelection && !searchPending,
+    );
+    const selectionPending =
+      !categoriesFailed &&
+      (searchPending ||
+        selectionSnapshotQuery.isPending ||
+        selectionSnapshotQuery.isFetching ||
+        selectionSnapshotQuery.isPaused);
+    // Never expose cached/partial IDs to a mutation while a new selection is resolving.
+    const bulkSnapshot =
+      !analysisSelection.active &&
+      hasSelection &&
+      !selectionPending &&
+      !categoriesFailed &&
+      !selectionSnapshotQuery.isError
+        ? selectionSnapshotQuery.snapshot
+        : undefined;
+    const selectedRowIds = useMemo(() => new Set(bulkSnapshot?.ids ?? []), [bulkSnapshot?.ids]);
     const retryCategories = () => {
       void spending.refetch();
       void income.refetch();
@@ -573,29 +594,20 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const dayGroups = useMemo(() => groupRowsByDay(rows, appTimezone), [rows, appTimezone]);
 
-    /**
-     * Selection only ever covers loaded rows, so summing them client-side is
-     * exact — and it sums the same signed figure the server nets, so the two
-     * readouts cannot disagree.
-     */
-    const selectedNet = useMemo(() => {
-      const selectedRows = rows.filter((r) => selectedRowIds.has(r.activity.id));
-      return withKnownNetCurrencies(netSummary(selectedRows, baseCurrency), selectedRows);
-    }, [rows, selectedRowIds, baseCurrency]);
+    const selectedNet = bulkSnapshot?.net ?? null;
+    const includesOtherPages = useMemo(() => {
+      const loadedIds = new Set(items.map((item) => item.id));
+      return bulkSnapshot?.ids.some((id) => !loadedIds.has(id)) ?? false;
+    }, [bulkSnapshot, items]);
     const bulkCategoryScope = useMemo<QuickCategorizeScope | null>(() => {
-      if (selectedRowIds.size === 0) return null;
-      const buckets = new Set(
-        rows
-          .filter((row) => selectedRowIds.has(row.activity.id))
-          .map((row) => row.activity.cashFlowBucket),
-      );
-      if (buckets.size !== 1) return null;
-      const [bucket] = [...buckets];
+      const buckets = bulkSnapshot?.cashFlowBuckets ?? [];
+      if (buckets.length !== 1) return null;
+      const [bucket] = buckets;
       if (bucket === "spending") return "expense";
       if (bucket === "income") return "income";
       if (bucket === "saving") return "saving";
       return null;
-    }, [rows, selectedRowIds]);
+    }, [bulkSnapshot]);
 
     const filtersActive =
       !!debouncedSearch ||
@@ -627,12 +639,6 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       setAmountRange({ min: null, max: null });
       setDateRange(undefined);
     }, []);
-
-    const [lastRequestKey, setLastRequestKey] = useState(requestKey);
-    if (lastRequestKey !== requestKey) {
-      setLastRequestKey(requestKey);
-      setSelectedRowIds(new Set());
-    }
 
     const { mutate: duplicateTransaction } = useMutation({
       mutationFn: async (row: TransactionRowVM) => {
@@ -730,7 +736,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         if (failed > 0) toast.error(t("spending:txTab.deleteFailedCount", { count: failed }));
         setDeletingIds(null);
         setDeletePreview(undefined);
-        setSelectedRowIds(new Set());
+        analysisSelection.clear();
       },
       onError: () => toast.error(t("spending:txTab.deleteFailed")),
     });
@@ -738,7 +744,10 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const handleBulkCategorize = useCallback(
       async (taxonomyId: string, categoryId: string) => {
         const ids = Array.from(selectedRowIds);
-        if (ids.length === 0) return;
+        if (ids.length === 0) {
+          toast.error(t("spending:transactions.selectionLoadFailed"));
+          return;
+        }
         try {
           const result = await bulkAssignMutation.mutateAsync(
             ids.map((activityId) => ({ activityId, taxonomyId, categoryId })),
@@ -747,14 +756,18 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         } catch {
           // Hook already toasts on error.
         }
-        setSelectedRowIds(new Set());
+        analysisSelection.clear();
       },
-      [selectedRowIds, bulkAssignMutation, t],
+      [selectedRowIds, bulkAssignMutation, t, analysisSelection],
     );
 
     const handleBulkSetEvent = useCallback(
       async (eventId: string | null) => {
         const ids = Array.from(selectedRowIds);
+        if (ids.length === 0) {
+          toast.error(t("spending:transactions.selectionLoadFailed"));
+          return;
+        }
         const results = await Promise.allSettled(
           ids.map((activityId) => setEventMutation.mutateAsync({ activityId, eventId })),
         );
@@ -768,17 +781,17 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           );
         }
         if (failed > 0) toast.error(t("spending:txTab.failedOnCount", { count: failed }));
-        setSelectedRowIds(new Set());
+        analysisSelection.clear();
       },
-      [selectedRowIds, setEventMutation, t],
+      [selectedRowIds, setEventMutation, t, analysisSelection],
     );
 
-    const clearSelection = useCallback(() => setSelectedRowIds(new Set()), []);
+    const clearSelection = analysisSelection.clear;
 
     const exitSelectionMode = useCallback(() => {
       setSelectionMode(false);
-      setSelectedRowIds(new Set());
-    }, []);
+      analysisSelection.clear();
+    }, [analysisSelection]);
 
     const handleAssignCategory = useCallback(
       (activityId: string, taxonomyId: string, categoryId: string) => {
@@ -847,22 +860,12 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const handleToggleRow = useCallback(
       (id: string) => {
-        if (analysisSelection.active) {
-          analysisSelection.toggle([id]);
-          return;
-        }
-        setSelectedRowIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          return next;
-        });
+        analysisSelection.toggle([id]);
       },
       [analysisSelection],
     );
 
-    const isRowSelected = (id: string) =>
-      analysisSelection.active ? analysisSelection.isSelected(id) : selectedRowIds.has(id);
+    const isRowSelected = analysisSelection.isSelected;
 
     const allVisibleSelected = rows.length > 0 && rows.every((r) => isRowSelected(r.activity.id));
     const someVisibleSelected =
@@ -876,36 +879,20 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const handleToggleDay = useCallback(
       (group: TransactionDayGroup) => {
-        if (analysisSelection.active) {
-          analysisSelection.toggle(group.rows.map((row) => row.activity.id));
-          return;
-        }
-        setSelectedRowIds((prev) => {
-          const next = new Set(prev);
-          const allSelected = group.rows.every((r) => next.has(r.activity.id));
-          group.rows.forEach((r) =>
-            allSelected ? next.delete(r.activity.id) : next.add(r.activity.id),
-          );
-          return next;
-        });
+        analysisSelection.toggle(group.rows.map((row) => row.activity.id));
       },
       [analysisSelection],
     );
 
     const toggleSelectAllVisible = () => {
-      if (analysisSelection.active) {
-        analysisSelection.toggle(rows.map((row) => row.activity.id));
-        return;
-      }
-      setSelectedRowIds((prev) => {
-        const next = new Set(prev);
-        if (allVisibleSelected) rows.forEach((r) => next.delete(r.activity.id));
-        else rows.forEach((r) => next.add(r.activity.id));
-        return next;
-      });
+      analysisSelection.toggle(rows.map((row) => row.activity.id));
     };
 
     const handleBulkDelete = () => {
+      if (selectedRowIds.size === 0) {
+        toast.error(t("spending:transactions.selectionLoadFailed"));
+        return;
+      }
       setDeletingIds(Array.from(selectedRowIds));
       setDeletePreview(undefined);
     };
@@ -1198,16 +1185,15 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           analysis={analysisQuery.data}
           pending={
             !categoriesFailed &&
-            (searchPending || analysisQuery.isPending || analysisQuery.isFetching)
+            (searchPending ||
+              analysisQuery.isPending ||
+              analysisQuery.isFetching ||
+              analysisQuery.isPaused)
           }
           failed={categoriesFailed || analysisQuery.isError}
-          onStart={() => {
-            clearSelection();
-            analysisSelection.start();
-          }}
+          onStart={analysisSelection.start}
           onStop={() => {
-            clearSelection();
-            setSelectionMode(false);
+            setSelectionMode(true);
             analysisSelection.stop();
           }}
           onSelectAll={analysisSelection.selectAll}
@@ -1221,16 +1207,32 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           }}
         />
 
-        {!analysisSelection.active && selectedRowIds.size > 0 && (
-          <TransactionsBulkBar
-            selectedCount={selectedRowIds.size}
-            categoryScope={bulkCategoryScope}
-            onCategorize={handleBulkCategorize}
-            onTagEvent={handleBulkSetEvent}
-            onDelete={handleBulkDelete}
-            onClearSelection={clearSelection}
-          />
-        )}
+        {!analysisSelection.active &&
+          hasSelection &&
+          (!bulkSnapshot || selectedRowIds.size > 0) && (
+            <TransactionsBulkBar
+              selectedCount={selectedRowIds.size}
+              categoryScope={bulkCategoryScope}
+              onCategorize={handleBulkCategorize}
+              onTagEvent={handleBulkSetEvent}
+              onDelete={handleBulkDelete}
+              onClearSelection={clearSelection}
+              selectionStatus={
+                categoriesFailed
+                  ? "error"
+                  : selectionPending
+                    ? "pending"
+                    : bulkSnapshot
+                      ? "ready"
+                      : "error"
+              }
+              onRetrySelection={() => {
+                if (categoriesFailed) retryCategories();
+                else void selectionSnapshotQuery.refetch();
+              }}
+              includesOtherPages={includesOtherPages}
+            />
+          )}
 
         {isLoading || (!categoriesReady && !categoriesFailed) ? (
           <div className="space-y-2">

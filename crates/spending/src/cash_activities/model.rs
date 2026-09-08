@@ -88,6 +88,21 @@ pub struct CashActivitySearchRequest {
     /// Optional analysis of the full filtered set, independent of pagination.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<CashActivitySelection>,
+    /// Materialize selected matching ids, net and buckets before pagination.
+    /// Requires `selection`, even when spending is disabled. Does not filter page items.
+    #[serde(default)]
+    pub include_selection_snapshot: bool,
+}
+
+impl CashActivitySearchRequest {
+    pub fn validate_selection_snapshot(&self) -> Result<(), crate::error::SpendingError> {
+        if self.include_selection_snapshot && self.selection.is_none() {
+            return Err(crate::error::SpendingError::InvalidInput {
+                message: "includeSelectionSnapshot requires selection".to_string(),
+            });
+        }
+        Ok(())
+    }
 }
 
 fn default_limit() -> usize {
@@ -262,6 +277,18 @@ pub struct NetSummary {
     pub converted: Option<CurrencyNet>,
 }
 
+/// Read-only projection of the full selected matching set, independent of page limits.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CashActivitySelectionSnapshot {
+    pub ids: Vec<String>,
+    /// Canonical selected net with known native zero currency buckets restored.
+    /// Restoring currency labels does not change the canonical converted total.
+    pub net: NetSummary,
+    /// Distinct actual selected buckets, using the full spending transfer context.
+    pub cash_flow_buckets: Vec<CashFlowBucket>,
+}
+
 /// Paginated response for cash-activity search.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -289,4 +316,7 @@ pub struct CashActivitySearchResponse {
     /// Requested selection totals over the full filtered snapshot, before pagination.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub analysis: Option<CashActivityAnalysis>,
+    /// Present only when `includeSelectionSnapshot` is true and `selection` is supplied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_snapshot: Option<CashActivitySelectionSnapshot>,
 }
