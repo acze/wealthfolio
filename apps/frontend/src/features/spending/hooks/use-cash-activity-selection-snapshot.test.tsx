@@ -9,12 +9,14 @@ import type {
   CashActivitySelectionSnapshot,
 } from "../types/cash-activity";
 import { useCashActivitySelectionSnapshot } from "./use-cash-activity-selection-snapshot";
+import { QueryKeys } from "@/lib/query-keys";
 
 const mocks = vi.hoisted(() => ({ searchCashActivities: vi.fn() }));
 vi.mock("../adapters/cash-activities", () => mocks);
 
-function createWrapper() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function createWrapper(
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   };
@@ -191,5 +193,27 @@ describe("useCashActivitySelectionSnapshot", () => {
     expect(result.current.snapshot).toBeUndefined();
     rerender({ enabled: true });
     await waitFor(() => expect(result.current.snapshot).toEqual(empty));
+  });
+
+  it("rechecks invalidation synchronously and detects a different ready snapshot before confirmation", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const selection: CashActivitySelection = { mode: "all", ids: [] };
+    const key = [QueryKeys.SPENDING_TRANSACTIONS, "selection-snapshot", {}, selection];
+    mocks.searchCashActivities.mockResolvedValue(response(["original"]));
+    const { result } = renderHook(() => useCashActivitySelectionSnapshot({}, selection, true), {
+      wrapper: createWrapper(client),
+    });
+    await waitFor(() => expect(result.current.snapshot?.ids).toEqual(["original"]));
+    const approved = result.current.snapshot;
+    act(() => {
+      void client.invalidateQueries({ queryKey: key, refetchType: "none" });
+      expect(result.current.getReadySnapshot()).toBeUndefined();
+    });
+    act(() => {
+      client.setQueryData(key, response(["replacement"]).selectionSnapshot);
+      expect(result.current.getReadySnapshot()).not.toBe(approved);
+      expect(result.current.getReadySnapshot()?.ids).toEqual(["replacement"]);
+    });
+    await waitFor(() => expect(result.current.snapshot?.ids).toEqual(["replacement"]));
   });
 });

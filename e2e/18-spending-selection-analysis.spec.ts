@@ -100,7 +100,8 @@ test.describe("Spending selection analysis with real paginated transactions", ()
       if (
         ["POST", "PUT", "DELETE", "PATCH"].includes(request.method()) &&
         ((path.startsWith("/api/v1/activities") && path !== "/api/v1/activities/search") ||
-          /^\/api\/v1\/spending\/(?:assignments|activities)\//.test(path))
+          (/^\/api\/v1\/spending\/(?:assignments|activities|cash-activities)\//.test(path) &&
+            path !== SEARCH_PATH))
       ) {
         writes.push(`${request.method()} ${path}`);
       }
@@ -762,5 +763,318 @@ test.describe("Spending selection analysis with real paginated transactions", ()
     await expect(page).toHaveURL(/\/spending\/insights/);
     expect(new URL(page.url()).searchParams.get("stage")).toBe("where");
     expect(new URL(page.url()).searchParams.get("period")).toBe("MTD");
+  });
+
+  test("late category/event completions preserve newer choices and failures keep unchanged selection", async () => {
+    const types = await api<{ id: string }[]>("/spending/event-types", undefined, "GET");
+    const eventName = `Synthetic delayed event ${token}`;
+    await api("/spending/events", {
+      name: eventName,
+      eventTypeId: types[0].id,
+      startDate: `${day}T00:00:00Z`,
+      endDate: `${day}T23:59:59Z`,
+    });
+    for (const kind of ["category", "event"] as const) {
+      await gotoAppPath(page, activitiesPath({ analysis: "false", q: zeroCurrencyNote }));
+      const purchase = page.getByRole("row").filter({ hasText: `${zeroCurrencyNote} purchase` });
+      const refund = page.getByRole("row").filter({ hasText: `${zeroCurrencyNote} refund` });
+      await purchase.getByRole("checkbox").click();
+      await expect(bulkRegion()).toContainText("1 selected");
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const pattern =
+        kind === "category"
+          ? "**/spending/assignments/bulk"
+          : "**/spending/cash-activities/*/event";
+      let intercepted = false;
+      await page.route(pattern, async (route) => {
+        intercepted = true;
+        await held;
+        await route.continue();
+      });
+      const completed = page.waitForResponse((response) =>
+        kind === "category"
+          ? response.url().endsWith("/spending/assignments/bulk")
+          : response.url().endsWith(`/spending/cash-activities/${zeroCurrencyIds[0]}/event`),
+      );
+      await bulkRegion()
+        .getByRole("button", {
+          name: kind === "category" ? "Categorize" : "Tag event",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("option", {
+          name: kind === "category" ? parentName : new RegExp(eventName),
+          exact: kind === "category",
+        })
+        .click();
+      await expect.poll(() => intercepted).toBe(true);
+      await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+      await expectCount(1, 2);
+      await refund.getByRole("checkbox").click();
+      await expectCount(2, 2);
+      release();
+      await (await completed).finished();
+      await expect(
+        page.getByText(kind === "category" ? "Categorized 1 activity." : "Tagged 1 activity.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expectCount(2, 2);
+      await expect(purchase.getByRole("checkbox")).toBeChecked();
+      await expect(refund.getByRole("checkbox")).toBeChecked();
+      await page.unroute(pattern);
+      await region().getByRole("button", { name: "Exit analysis" }).click();
+      await expect(bulkRegion()).toContainText("2 selected");
+      await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+      await expectCount(2, 2);
+    }
+
+    await gotoAppPath(page, activitiesPath({ analysis: "false", q: zeroCurrencyNote }));
+    await page
+      .getByRole("checkbox", { name: "Select all visible transactions", exact: true })
+      .click();
+    await expect(bulkRegion()).toContainText("2 selected");
+    await page.route("**/spending/assignments/bulk", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: '{"error":"Synthetic category failure"}',
+      }),
+    );
+    await bulkRegion().getByRole("button", { name: "Categorize", exact: true }).click();
+    await page.getByRole("option", { name: parentName, exact: true }).click();
+    await expect(page.getByText("Failed to apply categories.", { exact: true })).toBeVisible();
+    await expect(bulkRegion()).toContainText("2 selected");
+    await page.unroute("**/spending/assignments/bulk");
+
+    await page.route("**/spending/cash-activities/*/event", (route) =>
+      route.request().url().includes(zeroCurrencyIds[0])
+        ? route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: '{"error":"Synthetic event failure"}',
+          })
+        : route.continue(),
+    );
+    await bulkRegion().getByRole("button", { name: "Tag event", exact: true }).click();
+    await page.getByRole("option", { name: new RegExp(eventName) }).click();
+    await expect(page.getByText("Failed on 1 activity.", { exact: true })).toBeVisible();
+    await expect(bulkRegion()).toContainText("2 selected");
+    await page.unroute("**/spending/cash-activities/*/event");
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(2, 2);
+  });
+
+  test("keeps 1001 selected rows while disabling oversized categorization and respecting the API limit", async ({}, testInfo) => {
+    test.setTimeout(90000);
+    const note = `Synthetic oversized ${token}`;
+    const ids: string[] = [];
+    for (const size of [500, 500, 1]) {
+      const seeded = await api<{ created: { id: string }[]; errors: unknown[] }>(
+        "/activities/bulk",
+        {
+          creates: Array.from({ length: size }, (_, index) => ({
+            id: randomUUID(),
+            accountId,
+            activityType: "WITHDRAWAL",
+            currency: "CAD",
+            amount: "1",
+            activityDate: `${day}T08:00:00Z`,
+            notes: `${note} ${ids.length + index}`,
+          })),
+        },
+      );
+      expect(seeded.errors).toEqual([]);
+      expect(seeded.created).toHaveLength(size);
+      ids.push(...seeded.created.map((row) => row.id));
+    }
+    await gotoAppPath(page, activitiesPath({ q: note }));
+    await expectCount(0, 1001);
+    await region().getByRole("button", { name: "Select all matching" }).click();
+    await expectCount(1001, 1001);
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("1001 selected");
+    await expect(
+      bulkRegion().getByRole("button", { name: "Categorize", exact: true }),
+    ).toBeDisabled();
+    await expect(bulkRegion()).toContainText("Categorize up to 1000 transactions at once.");
+    const rejected = await page.request.post(`${BASE_URL}/api/v1/spending/assignments/bulk`, {
+      data: ids.map((activityId) => ({ activityId, taxonomyId: TAXONOMY, categoryId: parentId })),
+    });
+    expect(rejected.status()).toBe(400);
+    expect(await rejected.text()).toContain("At most 1000");
+    expect((await search({ search: note, status: "uncategorized" })).totalCount).toBe(1001);
+    await expect(bulkRegion()).toContainText("1001 selected");
+    await page.screenshot({
+      path: testInfo.outputPath("oversized-categorization-retains-selection.png"),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(1001, 1001);
+  });
+
+  test("revalidates bulk delete confirmation through pending, error and changed snapshots without gating single-row delete", async ({}, testInfo) => {
+    const outside = await api<{ id: string }>("/taxonomies/categories", {
+      taxonomyId: TAXONOMY,
+      name: `Outside confirmation ${token}`,
+      key: randomUUID(),
+      parentId: null,
+      color: "#3b82f6",
+      sortOrder: 101,
+    });
+    await gotoAppPath(page, activitiesPath({ q: ordinaryNote, category: parentId }));
+    await expectCount(0, 120);
+    await region().getByRole("button", { name: "Select all matching" }).click();
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("120 selected");
+    const deletes: string[] = [];
+    const recordDelete = (request: import("@playwright/test").Request) => {
+      if (request.method() === "DELETE" && request.url().includes("/api/v1/activities/"))
+        deletes.push(request.url());
+    };
+    page.on("request", recordDelete);
+    await bulkRegion().getByRole("button", { name: "Delete", exact: true }).click();
+    const dialog = page.getByRole("alertdialog");
+    const confirm = dialog.getByRole("button", { name: "Delete", exact: true });
+    const underlyingBulk = page.locator('[role="region"][aria-label="Bulk actions"]');
+    await expect(confirm).toBeEnabled();
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let failRead = true;
+    await page.route(`**${SEARCH_PATH}`, async (route) => {
+      if (!route.request().postDataJSON().includeSelectionSnapshot) return route.continue();
+      await held;
+      if (failRead)
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: '{"error":"Synthetic confirmation read failure"}',
+        });
+      else await route.continue();
+    });
+    await page.context().setOffline(true);
+    await page.waitForFunction(() => !navigator.onLine);
+    await page.context().setOffline(false);
+    await expect(underlyingBulk).toContainText("Preparing selected transactions...");
+    await expect(confirm).toBeDisabled();
+    await confirm.click({ force: true });
+    expect(deletes).toEqual([]);
+    release();
+    await expect(underlyingBulk).toContainText("Your selection is preserved.");
+    await expect(confirm).toBeDisabled();
+    expect(deletes).toEqual([]);
+
+    await api("/spending/assignments/bulk", [
+      { activityId: firstExpenseId, taxonomyId: TAXONOMY, categoryId: outside.id },
+    ]);
+    failRead = false;
+    await page.context().setOffline(true);
+    await page.waitForFunction(() => !navigator.onLine);
+    await page.context().setOffline(false);
+    await expect(underlyingBulk).toContainText("119 selected");
+    await expect(confirm).toBeDisabled();
+    await expect(dialog.getByRole("alert")).toContainText("Selection changed or is still loading.");
+    await page.screenshot({
+      path: testInfo.outputPath("invalidated-bulk-delete-confirmation.png"),
+      fullPage: true,
+    });
+    await confirm.click({ force: true });
+    expect(deletes).toEqual([]);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await page.unroute(`**${SEARCH_PATH}`);
+    await bulkRegion().getByRole("button", { name: "Clear", exact: true }).click();
+    await expect(bulkRegion()).toHaveCount(0);
+    const single = page.getByRole("row").filter({ hasText: `${ordinaryNote} 001` });
+    await single.getByRole("button", { name: "Row actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect(page.getByText("Deleted 1 activity.", { exact: true })).toBeVisible();
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]).toContain(`/activities/${ordinaryIds[1]}`);
+    page.off("request", recordDelete);
+  });
+
+  test("late and partially failed deletes do not clear newer or surviving selections", async () => {
+    await gotoAppPath(page, activitiesPath({ analysis: "false", q: ordinaryNote }));
+    const oldRow = page.getByRole("row").filter({ hasText: `${ordinaryNote} 002` });
+    const newRow = page.getByRole("row").filter({ hasText: `${ordinaryNote} 003` });
+    await oldRow.getByRole("checkbox").click();
+    await expect(bulkRegion()).toContainText("1 selected");
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const oldPath = `**/activities/${ordinaryIds[2]}`;
+    await page.route(oldPath, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const completed = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/activities/${ordinaryIds[2]}`) &&
+        response.request().method() === "DELETE",
+    );
+    await bulkRegion().getByRole("button", { name: "Delete", exact: true }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(1, 119);
+    await oldRow.getByRole("checkbox").click();
+    await newRow.getByRole("checkbox").click();
+    await expectCount(1, 119);
+    release();
+    await (await completed).finished();
+    await expect(page.getByText("Deleted 1 activity.", { exact: true })).toBeVisible();
+    await expectCount(1, 118);
+    await expect(newRow.getByRole("checkbox")).toBeChecked();
+    await page.unroute(oldPath);
+
+    await region().getByRole("button", { name: "Clear selection" }).click();
+    await page
+      .getByRole("row")
+      .filter({ hasText: `${ordinaryNote} 004` })
+      .getByRole("checkbox")
+      .click();
+    await page
+      .getByRole("row")
+      .filter({ hasText: `${ordinaryNote} 005` })
+      .getByRole("checkbox")
+      .click();
+    await expectCount(2, 118);
+    await region().getByRole("button", { name: "Exit analysis" }).click();
+    await expect(bulkRegion()).toContainText("2 selected");
+    const failedPath = `**/activities/${ordinaryIds[4]}`;
+    await page.route(failedPath, (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: '{"error":"Synthetic delete failure"}',
+      }),
+    );
+    await bulkRegion().getByRole("button", { name: "Delete", exact: true }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await expect(page.getByText("Failed to delete 1 activity.", { exact: true })).toBeVisible();
+    await expect(bulkRegion()).toContainText("1 selected");
+    await page.unroute(failedPath);
+    await page.getByRole("button", { name: "Analyze selection", exact: true }).click();
+    await expectCount(1, 117);
+    await expect(
+      page
+        .getByRole("row")
+        .filter({ hasText: `${ordinaryNote} 004` })
+        .getByRole("checkbox"),
+    ).toBeChecked();
   });
 });

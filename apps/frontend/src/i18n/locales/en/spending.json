@@ -142,6 +142,8 @@
     "amountChipBetween": "Amount between {{value}} and {{value2}}"
   },
   "transactions": {
+    "categorizeLimit": "Categorize up to {{limit}} transactions at once. Narrow the selection to continue.",
+    "deleteSelectionUnavailable": "Selection changed or is still loading. Close this dialog and review it before deleting.",
     "preparingSelection": "Preparing selected transactions...",
     "selectionLoadFailed": "Could not prepare selected transactions. Your selection is preserved.",
     "includesOtherPages": "Includes selected transactions on other pages.",

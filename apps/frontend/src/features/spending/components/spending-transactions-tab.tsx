@@ -64,6 +64,7 @@ import {
   getEffectiveCashActivityType,
   isCreditCardAccountType,
   isSpendingAccountType,
+  MAX_BULK_CATEGORY_ASSIGNMENTS,
 } from "../lib/constants";
 import { cashActivityFlowMetadata } from "../lib/cash-activity-form-utils";
 import {
@@ -79,7 +80,10 @@ import {
 import { useCashActivitySearch } from "../hooks/use-cash-activity-search";
 import { useCashActivityAnalysis } from "../hooks/use-cash-activity-analysis";
 import { useCashActivitySelectionSnapshot } from "../hooks/use-cash-activity-selection-snapshot";
-import { useAnalysisSelection } from "../hooks/use-analysis-selection";
+import {
+  useAnalysisSelection,
+  type AnalysisSelectionContext,
+} from "../hooks/use-analysis-selection";
 import { expandCategoryIds } from "../lib/category-rollup";
 import { localDateBoundaryToISOString } from "../lib/timezone";
 import {
@@ -95,6 +99,7 @@ import { useSpendingSettings } from "../hooks/use-spending-settings";
 import { invalidateSpendingCaches } from "../lib/invalidation";
 import type {
   CashActivitySearchRequest,
+  CashActivitySelectionSnapshot,
   CashActivityStatusFilter,
   NewActivitySplit,
 } from "../types/cash-activity";
@@ -181,6 +186,20 @@ export interface SpendingTransactionsTabHandle {
   openAddForm: () => void;
 }
 
+interface DeleteRequest {
+  ids: string[];
+  preview?: DeletePreview;
+  bulkSelection?: {
+    context: AnalysisSelectionContext;
+    snapshot: CashActivitySelectionSnapshot;
+  };
+}
+
+interface DeleteSubmission {
+  request: DeleteRequest;
+  selectionContext: AnalysisSelectionContext;
+}
+
 function toActivityDetails(row: TransactionRowVM, account?: Account): Partial<ActivityDetails> {
   const activity = row.activity;
   const activityType = getEffectiveCashActivityType(activity);
@@ -249,8 +268,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       mode: "link" | "unlink";
       row: TransactionRowVM | null;
     }>({ open: false, mode: "link", row: null });
-    const [deletingIds, setDeletingIds] = useState<string[] | null>(null);
-    const [deletePreview, setDeletePreview] = useState<DeletePreview | undefined>();
+    const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
 
     const [searchInput, setSearchInput] = useState(urlSearchQuery ?? "");
     const searchInputRef = useRef(searchInput.trim());
@@ -566,6 +584,16 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         ? selectionSnapshotQuery.snapshot
         : undefined;
     const selectedRowIds = useMemo(() => new Set(bulkSnapshot?.ids ?? []), [bulkSnapshot?.ids]);
+    const { getReadySnapshot } = selectionSnapshotQuery;
+    const getActionSnapshot = useCallback(() => {
+      const current = getReadySnapshot();
+      return current && current === bulkSnapshot ? current : undefined;
+    }, [bulkSnapshot, getReadySnapshot]);
+    const canConfirmDelete = (request: DeleteRequest | null) =>
+      !!request?.ids.length &&
+      (!request.bulkSelection ||
+        (request.bulkSelection.context === analysisSelection.context &&
+          getActionSnapshot() === request.bulkSelection.snapshot));
     const retryCategories = () => {
       void spending.refetch();
       void income.refetch();
@@ -722,11 +750,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     });
 
     const deleteMutation = useMutation({
-      mutationFn: async (ids: string[]) => {
-        const results = await Promise.allSettled(ids.map((id) => deleteActivity(id)));
+      mutationFn: async ({ request }: DeleteSubmission) => {
+        const results = await Promise.allSettled(request.ids.map((id) => deleteActivity(id)));
         return results;
       },
-      onSuccess: (results) => {
+      onSuccess: (results, submitted) => {
         invalidateSpendingCaches(qc);
         qc.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
         qc.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
@@ -734,40 +762,49 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         const failed = results.length - ok;
         if (ok > 0) toast.success(t("spending:txTab.deletedCount", { count: ok }));
         if (failed > 0) toast.error(t("spending:txTab.deleteFailedCount", { count: failed }));
-        setDeletingIds(null);
-        setDeletePreview(undefined);
-        analysisSelection.clear();
+        setDeleteRequest((current) => (current === submitted.request ? null : current));
+        if (failed === 0) analysisSelection.clearIfUnchanged(submitted.selectionContext);
       },
       onError: () => toast.error(t("spending:txTab.deleteFailed")),
     });
 
     const handleBulkCategorize = useCallback(
       async (taxonomyId: string, categoryId: string) => {
-        const ids = Array.from(selectedRowIds);
-        if (ids.length === 0) {
+        const snapshot = getActionSnapshot();
+        if (!snapshot?.ids.length) {
           toast.error(t("spending:transactions.selectionLoadFailed"));
           return;
         }
+        if (snapshot.ids.length > MAX_BULK_CATEGORY_ASSIGNMENTS) {
+          toast.error(
+            t("spending:transactions.categorizeLimit", { limit: MAX_BULK_CATEGORY_ASSIGNMENTS }),
+          );
+          return;
+        }
+        const ids = [...snapshot.ids];
+        const submittedContext = analysisSelection.context;
         try {
           const result = await bulkAssignMutation.mutateAsync(
             ids.map((activityId) => ({ activityId, taxonomyId, categoryId })),
           );
           toast.success(t("spending:txTab.categorizedCount", { count: result.length }));
+          analysisSelection.clearIfUnchanged(submittedContext);
         } catch {
           // Hook already toasts on error.
         }
-        analysisSelection.clear();
       },
-      [selectedRowIds, bulkAssignMutation, t, analysisSelection],
+      [getActionSnapshot, bulkAssignMutation, t, analysisSelection],
     );
 
     const handleBulkSetEvent = useCallback(
       async (eventId: string | null) => {
-        const ids = Array.from(selectedRowIds);
-        if (ids.length === 0) {
+        const snapshot = getActionSnapshot();
+        if (!snapshot?.ids.length) {
           toast.error(t("spending:transactions.selectionLoadFailed"));
           return;
         }
+        const ids = [...snapshot.ids];
+        const submittedContext = analysisSelection.context;
         const results = await Promise.allSettled(
           ids.map((activityId) => setEventMutation.mutateAsync({ activityId, eventId })),
         );
@@ -781,9 +818,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           );
         }
         if (failed > 0) toast.error(t("spending:txTab.failedOnCount", { count: failed }));
-        analysisSelection.clear();
+        if (failed === 0) analysisSelection.clearIfUnchanged(submittedContext);
       },
-      [selectedRowIds, setEventMutation, t, analysisSelection],
+      [getActionSnapshot, setEventMutation, t, analysisSelection],
     );
 
     const clearSelection = analysisSelection.clear;
@@ -844,11 +881,13 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     );
     const handleDeleteRow = useCallback((row: TransactionRowVM) => {
       const activityType = getEffectiveCashActivityType(row.activity);
-      setDeletingIds([row.activity.id]);
-      setDeletePreview({
-        activityType,
-        amount: row.activity.amount ?? null,
-        currency: row.activity.currency,
+      setDeleteRequest({
+        ids: [row.activity.id],
+        preview: {
+          activityType,
+          amount: row.activity.amount ?? null,
+          currency: row.activity.currency,
+        },
       });
     }, []);
     const handleLinkTransfer = useCallback((row: TransactionRowVM) => {
@@ -889,12 +928,15 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     };
 
     const handleBulkDelete = () => {
-      if (selectedRowIds.size === 0) {
+      const snapshot = getActionSnapshot();
+      if (!snapshot?.ids.length) {
         toast.error(t("spending:transactions.selectionLoadFailed"));
         return;
       }
-      setDeletingIds(Array.from(selectedRowIds));
-      setDeletePreview(undefined);
+      setDeleteRequest({
+        ids: [...snapshot.ids],
+        bulkSelection: { context: analysisSelection.context, snapshot },
+      });
     };
 
     const typeOptions = useMemo<FilterOption[]>(
@@ -1381,15 +1423,22 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           ))}
 
         <DeleteTransactionsDialog
-          open={!!deletingIds && deletingIds.length > 0}
-          count={deletingIds?.length ?? 0}
-          preview={deletePreview}
+          open={!!deleteRequest?.ids.length}
+          count={deleteRequest?.ids.length ?? 0}
+          preview={deleteRequest?.preview}
           isPending={deleteMutation.isPending}
-          onCancel={() => {
-            setDeletingIds(null);
-            setDeletePreview(undefined);
+          canConfirm={canConfirmDelete(deleteRequest)}
+          onCancel={() => setDeleteRequest(null)}
+          onConfirm={() => {
+            if (!deleteRequest || !canConfirmDelete(deleteRequest)) {
+              toast.error(t("spending:transactions.deleteSelectionUnavailable"));
+              return;
+            }
+            deleteMutation.mutate({
+              request: deleteRequest,
+              selectionContext: analysisSelection.context,
+            });
           }}
-          onConfirm={() => deletingIds && deleteMutation.mutate(deletingIds)}
         />
 
         <TransferMatchDialog

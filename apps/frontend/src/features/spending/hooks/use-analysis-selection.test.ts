@@ -104,4 +104,46 @@ describe("analytical selection", () => {
     act(() => result.current.start());
     expect(result.current.selection).toEqual({ mode: "explicit", ids: [] });
   });
+
+  it("clears a successful submission only while its selection context is unchanged", () => {
+    const { result } = renderHook(() => useAnalysisSelection("scope"));
+    act(() => result.current.toggle(["submitted"]));
+    const submitted = result.current.context;
+    act(() => result.current.clearIfUnchanged(submitted));
+    expect(result.current.selection).toEqual({ mode: "explicit", ids: [] });
+    expect(result.current.active).toBe(false);
+  });
+
+  it("does not let an old completion clear edited exclusions or a newer mode", () => {
+    const { result } = renderHook(() => useAnalysisSelection("scope"));
+    act(() => result.current.selectAll());
+    const submitted = result.current.context;
+    act(() => result.current.start());
+    act(() => result.current.toggle(["new-exclusion"]));
+    act(() => result.current.clearIfUnchanged(submitted));
+    expect(result.current.active).toBe(true);
+    expect(result.current.selection).toEqual({ mode: "all", ids: ["new-exclusion"] });
+  });
+
+  it("rejects stale completion even after switching back to identical IDs and mode", () => {
+    const { result } = renderHook(() => useAnalysisSelection("scope"));
+    act(() => result.current.toggle(["submitted"]));
+    const submitted = result.current.context;
+    act(() => result.current.start());
+    act(() => result.current.stop());
+    act(() => result.current.clearIfUnchanged(submitted));
+    expect(result.current.selection).toEqual({ mode: "explicit", ids: ["submitted"] });
+  });
+
+  it("keeps a newer filter selection when an older operation completes", () => {
+    const { result, rerender } = renderHook(({ scope }) => useAnalysisSelection(scope), {
+      initialProps: { scope: "old" },
+    });
+    act(() => result.current.toggle(["submitted"]));
+    const submitted = result.current.context;
+    rerender({ scope: "new" });
+    act(() => result.current.toggle(["new-row"]));
+    act(() => result.current.clearIfUnchanged(submitted));
+    expect(result.current.selection).toEqual({ mode: "explicit", ids: ["new-row"] });
+  });
 });

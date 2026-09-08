@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button, Icons } from "@wealthfolio/ui";
 
+import { MAX_BULK_CATEGORY_ASSIGNMENTS } from "../lib/constants";
 import { QuickCategorizePopover, type QuickCategorizeScope } from "./quick-categorize-popover";
 import { QuickEventPopover } from "./quick-event-popover";
 
@@ -29,6 +30,10 @@ export function TransactionsBulkBar({
   includesOtherPages = false,
 }: TransactionsBulkBarProps) {
   const { t } = useTranslation();
+  const exceedsCategoryLimit = selectedCount > MAX_BULK_CATEGORY_ASSIGNMENTS;
+  const categoryLimitHint = t("spending:transactions.categorizeLimit", {
+    limit: MAX_BULK_CATEGORY_ASSIGNMENTS,
+  });
   if (selectionStatus !== "ready") {
     return (
       <div
@@ -73,11 +78,14 @@ export function TransactionsBulkBar({
             {t("spending:transactions.includesOtherPages")}
           </span>
         )}
+        {exceedsCategoryLimit && (
+          <span className="text-muted-foreground text-xs">{categoryLimitHint}</span>
+        )}
       </div>
       {/* Wraps: on a phone these four buttons do not fit beside the count, and
           without it the last one is cut off at the edge of the screen. */}
       <div className="flex flex-wrap items-center gap-2">
-        {categoryScope ? (
+        {categoryScope && !exceedsCategoryLimit ? (
           <QuickCategorizePopover
             align="end"
             scope={categoryScope}
@@ -94,7 +102,9 @@ export function TransactionsBulkBar({
             size="sm"
             variant="default"
             disabled
-            title={t("spending:transactions.categorizeHint")}
+            title={
+              exceedsCategoryLimit ? categoryLimitHint : t("spending:transactions.categorizeHint")
+            }
           >
             <Icons.Tag className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             {t("spending:transactions.categorize")}

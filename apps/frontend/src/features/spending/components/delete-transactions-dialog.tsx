@@ -27,6 +27,7 @@ interface DeleteTransactionsDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   isPending?: boolean;
+  canConfirm?: boolean;
 }
 
 export function DeleteTransactionsDialog({
@@ -36,6 +37,7 @@ export function DeleteTransactionsDialog({
   onConfirm,
   onCancel,
   isPending,
+  canConfirm = true,
 }: DeleteTransactionsDialogProps) {
   const formatting = useAmountFormatting();
   const { t } = useTranslation();
@@ -59,12 +61,17 @@ export function DeleteTransactionsDialog({
           <AlertDialogDescription>
             {t("spending:transactions.deleteMessageWithUndo", { message })}
           </AlertDialogDescription>
+          {!canConfirm && (
+            <p role="alert" className="text-destructive text-sm">
+              {t("spending:transactions.deleteSelectionUnavailable")}
+            </p>
+          )}
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>{t("common:cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            disabled={isPending}
+            disabled={isPending || !canConfirm}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {t("common:delete")}
