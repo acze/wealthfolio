@@ -123,6 +123,8 @@
     "amountChipBetween": "金額が{{value}}〜{{value2}}"
   },
   "transactions": {
+    "categorizeLimit": "一度にカテゴリを設定できる取引は{{limit}}件までです。選択する取引を減らして続行してください。",
+    "deleteSelectionUnavailable": "選択内容が変更されたか、まだ読み込み中です。このダイアログを閉じて、削除する前に選択内容を確認してください。",
     "deleteTitle_one": "取引を削除",
     "deleteTitle_other": "取引を削除",
     "deleteConfirmSingle": "この{{type}}({{amount}})を削除してもよろしいですか?",

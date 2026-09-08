@@ -123,6 +123,8 @@
     "amountChipBetween": "Betrag zwischen {{value}} und {{value2}}"
   },
   "transactions": {
+    "categorizeLimit": "Es können höchstens {{limit}} Transaktionen gleichzeitig kategorisiert werden. Bitte die Auswahl einschränken, um fortzufahren.",
+    "deleteSelectionUnavailable": "Die Auswahl hat sich geändert oder wird noch geladen. Bitte das Dialogfeld schließen und die Auswahl vor dem Löschen prüfen.",
     "deleteTitle_one": "Transaktion löschen",
     "deleteTitle_other": "Transaktionen löschen",
     "deleteConfirmSingle": "Möchten Sie diese(n) {{type}} über {{amount}} wirklich löschen?",

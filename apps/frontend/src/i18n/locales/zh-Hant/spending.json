@@ -123,6 +123,8 @@
     "amountChipBetween": "金額介於 {{value}} 和 {{value2}} 之間"
   },
   "transactions": {
+    "categorizeLimit": "一次最多可為 {{limit}} 筆交易分類。請縮小選取範圍後繼續。",
+    "deleteSelectionUnavailable": "選取內容已變更或仍在載入中。請關閉此對話方塊，並在刪除前檢查選取內容。",
     "deleteTitle_one": "刪除交易",
     "deleteTitle_other": "刪除交易",
     "deleteConfirmSingle": "確定要刪除這筆 {{amount}} 的{{type}}嗎？",

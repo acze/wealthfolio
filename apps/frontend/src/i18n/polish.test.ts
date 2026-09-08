@@ -14,6 +14,10 @@ const polish = import.meta.glob<Catalog>("./locales/pl/*.json", {
   eager: true,
   import: "default",
 });
+const spendingCatalogs = import.meta.glob<Catalog>("./locales/*/spending.json", {
+  eager: true,
+  import: "default",
+});
 
 function flatten(catalog: Catalog, prefix = ""): Map<string, string> {
   return new Map(
@@ -148,5 +152,24 @@ describe("Polish catalogs", () => {
     expect(spending.get("cashFlow.spending")).toBe("Wydatki");
     expect(spending.get("cashFlow.saving")).toBe("Oszczędności");
     expect(spending.get("cashFlow.net")).toBe("Przepływy pieniężne netto");
+  });
+
+  it("includes the latest selection-safety messages in every existing locale", () => {
+    const source = flatten(english["./locales/en/spending.json"]);
+    for (const [path, catalog] of Object.entries(spendingCatalogs)) {
+      const translated = flatten(catalog);
+      for (const key of [
+        "transactions.categorizeLimit",
+        "transactions.deleteSelectionUnavailable",
+      ]) {
+        const value = translated.get(key);
+        expect(value, `${path}:${key}`).toBeTypeOf("string");
+        expect(value?.trim(), `${path}:${key}`).not.toBe("");
+        expect(tokens(value!, /{{[^}]+}}/g), `${path}:${key}`).toEqual(
+          tokens(source.get(key)!, /{{[^}]+}}/g),
+        );
+        if (!path.includes("/en/")) expect(value, `${path}:${key}`).not.toBe(source.get(key));
+      }
+    }
   });
 });

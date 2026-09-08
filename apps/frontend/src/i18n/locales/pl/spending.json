@@ -144,6 +144,8 @@
     "amountChipBetween": "Kwota od {{value}} do {{value2}}"
   },
   "transactions": {
+    "categorizeLimit": "Możesz przypisać kategorię do maksymalnie {{limit}} transakcji naraz. Zawęź zaznaczenie, aby kontynuować.",
+    "deleteSelectionUnavailable": "Zaznaczenie uległo zmianie lub jest jeszcze wczytywane. Zamknij to okno i sprawdź zaznaczenie przed usunięciem.",
     "deleteTitle_one": "Usuń transakcję",
     "deleteTitle_few": "Usuń transakcje",
     "deleteTitle_many": "Usuń transakcje",
