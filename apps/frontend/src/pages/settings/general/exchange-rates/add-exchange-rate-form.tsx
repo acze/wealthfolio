@@ -43,7 +43,7 @@ import { useCustomProviders } from "@/hooks/use-custom-providers";
 import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
 import { ExchangeRate } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { MoneyInput, worldCurrencies } from "@wealthfolio/ui";
+import { getLocalizedCurrencyOptions, MoneyInput, worldCurrencies } from "@wealthfolio/ui";
 
 interface ExchangeRateFormData {
   fromCurrency: string;
@@ -58,7 +58,11 @@ interface AddExchangeRateFormProps {
 }
 
 export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currencies = getLocalizedCurrencyOptions(
+    worldCurrencies,
+    i18n.resolvedLanguage || i18n.language,
+  );
   const exchangeRateSchema = z
     .object({
       fromCurrency: z.string().min(1, t("settings:fx_err_from_required")),
@@ -118,7 +122,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
 
     const handleSearchChange = (value: string) => {
       setSearchValue(value);
-      const matchingCurrency = worldCurrencies.find(
+      const matchingCurrency = currencies.find(
         (currency) =>
           currency.label.toLowerCase().includes(value.toLowerCase()) ||
           currency.value.includes(value),
@@ -148,7 +152,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                     className={cn("justify-between", !field.value && "text-muted-foreground")}
                   >
                     {field.value
-                      ? worldCurrencies.find((currency) => currency.value === field.value)?.label ||
+                      ? currencies.find((currency) => currency.value === field.value)?.label ||
                         field.value
                       : t("settings:fx_select_currency")}
                     <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -184,7 +188,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                           </CommandItem>
                         )}
 
-                        {worldCurrencies
+                        {currencies
                           .filter(
                             (currency) =>
                               currency.label.toLowerCase().includes(searchValue.toLowerCase()) ||

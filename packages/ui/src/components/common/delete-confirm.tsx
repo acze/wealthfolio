@@ -1,4 +1,5 @@
 import { ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import { Icons } from "../ui/icons";
@@ -20,6 +21,7 @@ export const DeleteConfirm = ({
   button,
   isPending,
 }: DeleteConfirmProps) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   return (
     <Popover open={isOpen} onOpenChange={(open) => setIsOpen(open)}>
@@ -31,6 +33,7 @@ export const DeleteConfirm = ({
             variant="ghost"
             size="sm"
             className="text-destructive hover:text-destructive h-7 w-7 p-0"
+            aria-label={deleteConfirmTitle}
             onClick={(e) => {
               e.stopPropagation(); // Prevent accordion from toggling
             }}
@@ -54,16 +57,16 @@ export const DeleteConfirm = ({
                 handleCancel?.();
               }}
             >
-              Cancel
+              {t("ui:dialog.cancel", "Cancel")}
             </Button>
             <Button variant="destructive" size="sm" disabled={isPending} onClick={handleDeleteConfirm}>
               {isPending ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  {t("ui:dataGrid.deleting", "Deleting...")}
                 </>
               ) : (
-                "Delete"
+                t("ui:dialog.delete", "Delete")
               )}
             </Button>
           </div>

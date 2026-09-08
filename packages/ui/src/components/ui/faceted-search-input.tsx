@@ -13,7 +13,7 @@ export function FacetedSearchInput({
   value,
   onChange,
   onClear,
-  placeholder = "Search ...",
+  placeholder,
   className,
   ...props
 }: FacetedSearchInputProps) {
@@ -30,7 +30,7 @@ export function FacetedSearchInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("ui:dataTable.search", "Search ...")}
         className={cn(
           "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
           "placeholder:text-muted-foreground",

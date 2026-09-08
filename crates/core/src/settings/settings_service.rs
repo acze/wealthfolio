@@ -8,10 +8,10 @@ use log::{debug, error};
 use std::sync::Arc;
 
 const SUPPORTED_FORMATTING_REGIONS: &[&str] = &[
-    "system", "CA", "US", "GB", "FR", "DE", "ES", "MX", "BR", "PT", "CN", "TW", "JP", "KR", "IT",
+    "system", "CA", "US", "GB", "FR", "DE", "ES", "MX", "BR", "PT", "CN", "TW", "JP", "KR", "IT", "PL",
 ];
 const SUPPORTED_UI_LANGUAGES: &[&str] = &[
-    "en", "fr", "de", "es", "pt", "zh", "zh-Hant", "ja", "ko", "it",
+    "en", "fr", "de", "es", "pt", "zh", "zh-Hant", "ja", "ko", "it", "pl",
 ];
 
 /// Traditional Chinese is written in Taiwan, Hong Kong and Macau. Match the
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn preserves_explicit_system_formatting_preference() {
-        for language in ["en-US", "fr-FR", "zh-Hans-CN", "ja-JP", "ko-KR"] {
+        for language in ["en-US", "fr-FR", "zh-Hans-CN", "ja-JP", "ko-KR", "pl-PL"] {
             assert_eq!(normalize_formatting_region(language, "system"), "system");
         }
     }
@@ -274,6 +274,22 @@ mod tests {
     fn preserves_script_qualified_ui_language() {
         assert_eq!(normalize_ui_language("zh-Hant"), "zh-Hant");
         assert_eq!(validate_ui_language("zh-Hant").unwrap(), "zh-Hant");
+    }
+
+    #[test]
+    fn accepts_polish_language_and_regional_aliases() {
+        for language in ["pl", "pl-PL", "pl_PL", "pl-US"] {
+            assert_eq!(normalize_ui_language(language), "pl");
+            assert_eq!(validate_ui_language(language).unwrap(), "pl");
+        }
+    }
+
+    #[test]
+    fn keeps_polish_language_and_formatting_region_independent() {
+        assert_eq!(normalize_formatting_region("pl", "US"), "US");
+        assert_eq!(normalize_formatting_region("en", "pl-PL"), "PL");
+        assert_eq!(normalize_formatting_region("pl", "system"), "system");
+        assert!(validate_formatting_region("PL").is_ok());
     }
 
     #[test]

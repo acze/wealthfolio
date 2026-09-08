@@ -1,4 +1,6 @@
 import type React from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import { PrivacyAmount } from "../financial/privacy-amount";
 import { cn } from "../../lib/utils";
@@ -97,13 +99,15 @@ const getStatusColorClass = (percentUsed: number, varianceTolerance: number): st
   return "text-success";
 };
 
-const getStatusText = (percentUsed: number, varianceTolerance: number): string => {
+const getStatusText = (percentUsed: number, varianceTolerance: number, t: TFunction): string => {
   const underBudgetThreshold = 100 - varianceTolerance;
   const onTrackUpperBound = 100 + varianceTolerance;
-  if (percentUsed >= 120) return `${Math.round(percentUsed - 100)}% over budget`;
-  if (percentUsed > onTrackUpperBound) return `${Math.round(percentUsed - 100)}% over budget`;
-  if (percentUsed >= underBudgetThreshold) return "On track";
-  return `${Math.round(percentUsed)}% used`;
+  if (percentUsed >= 120)
+    return t("ui:budget.overBudget", "{{percent}}% over budget", { percent: Math.round(percentUsed - 100) });
+  if (percentUsed > onTrackUpperBound)
+    return t("ui:budget.overBudget", "{{percent}}% over budget", { percent: Math.round(percentUsed - 100) });
+  if (percentUsed >= underBudgetThreshold) return t("ui:budget.onTrack", "On track");
+  return t("ui:budget.used", "{{percent}}% used", { percent: Math.round(percentUsed) });
 };
 
 export const BudgetGaugeCard: React.FC<BudgetGaugeCardProps> = ({
@@ -117,8 +121,9 @@ export const BudgetGaugeCard: React.FC<BudgetGaugeCardProps> = ({
   onClick,
   varianceTolerance = 10,
 }) => {
+  const { t } = useTranslation();
   const statusColor = getStatusColorClass(percentUsed, varianceTolerance);
-  const statusText = getStatusText(percentUsed, varianceTolerance);
+  const statusText = getStatusText(percentUsed, varianceTolerance, t);
 
   return (
     <div

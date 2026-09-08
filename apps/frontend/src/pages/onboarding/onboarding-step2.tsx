@@ -1,7 +1,12 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/i18n/locales";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createFormatter, Icons, resolveFormattingLocale } from "@wealthfolio/ui";
+import {
+  createFormatter,
+  getLocalizedCurrencyOptions,
+  Icons,
+  resolveFormattingLocale,
+} from "@wealthfolio/ui";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import {
   Form,
@@ -91,6 +96,7 @@ const formattingRegions = [
   ["JP", "japan"],
   ["KR", "southKorea"],
   ["IT", "italy"],
+  ["PL", "poland"],
 ] as const;
 
 const popularFormattingRegions = ["system", "US", "CA", "GB"];
@@ -158,7 +164,7 @@ interface OnboardingStep2Props {
 
 export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2Props>(
   ({ onNext, onValidityChange }, ref) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { settings, updateSettings } = useSettingsContext();
     const [language, setLanguage] = useState<string>(settings?.language ?? DEFAULT_LOCALE);
     const [formattingRegion, setFormattingRegion] = useState(
@@ -183,7 +189,11 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       resolver: zodResolver(onboardingSettingsSchema),
     });
 
-    const filteredCurrencies = worldCurrencies.filter(
+    const currencies = getLocalizedCurrencyOptions(
+      worldCurrencies,
+      i18n.resolvedLanguage || i18n.language,
+    );
+    const filteredCurrencies = currencies.filter(
       (curr) =>
         curr.value.toLowerCase().includes(currencySearch.toLowerCase()) ||
         curr.label.toLowerCase().includes(currencySearch.toLowerCase()),
@@ -232,7 +242,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       setFormattingRegion(region);
       setShowFormattingRegionSearch(false);
       setFormattingRegionSearch("");
-      if (!form.formState.dirtyFields.baseCurrency) {
+      if (!settings?.baseCurrency && !form.formState.dirtyFields.baseCurrency) {
         const suggestedCurrency = detectDefaultCurrency(resolveFormattingLocale(region));
         if (suggestedCurrency) {
           form.setValue("baseCurrency", suggestedCurrency, { shouldValidate: true });

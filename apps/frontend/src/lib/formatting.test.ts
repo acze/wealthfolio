@@ -14,7 +14,7 @@ import {
   resolveFormattingLocale,
 } from "@wealthfolio/ui";
 import { format } from "date-fns";
-import { zhTW } from "date-fns/locale";
+import { pl, zhTW } from "date-fns/locale";
 import { describe, expect, it, vi } from "vitest";
 import { formatOptionSubtitle } from "./occ-symbol";
 
@@ -31,6 +31,8 @@ describe("locale formatting", () => {
     expect(resolveFormattingLocale("DE", "ja")).toBe("de-DE");
     expect(resolveFormattingLocale("TW", "en")).toBe("zh-TW");
     expect(resolveFormattingLocale("en-US", "fr")).toBe("en-US");
+    expect(resolveFormattingLocale("PL", "en")).toBe("pl-PL");
+    expect(resolveFormattingLocale("US", "pl")).toBe("en-US");
   });
 
   it("preserves a language-only system locale", () => {
@@ -50,7 +52,7 @@ describe("locale formatting", () => {
     expect(formatter.formatDecimal(1234.56)).toBe("1.234,56");
   });
 
-  it.each(["en", "ja", "ko", "zh"])(
+  it.each(["en", "ja", "ko", "zh", "pl"])(
     "keeps German conventions authoritative with a %s UI",
     (uiLocale) => {
       const locale = resolveFormattingLocale("DE", uiLocale);
@@ -84,6 +86,23 @@ describe("locale formatting", () => {
       expect(locale.options?.weekStartsOn).toBe(0);
     },
   );
+
+  it.each(["pl", "pl-PL", "pl-US"])("uses complete Polish date-fns text for %s", (tag) => {
+    const locale = dateFnsLocaleFor(tag);
+    expect(locale.formatDistance).toBe(pl.formatDistance);
+    expect(format(new Date(2026, 6, 10), "PPPP", { locale })).toBe("piątek, 10 lipca 2026");
+    expect(locale.options?.weekStartsOn).toBe(tag === "pl-US" ? 0 : 1);
+  });
+
+  it("formats Polish numbers and dates without changing the requested currency", () => {
+    const formatter = createFormatter(resolveFormattingLocale("PL"), "UTC");
+    expect(formatter.formatDecimal(12345.67)).toMatch(/^12\s345,67$/);
+    expect(formatter.parseNumber("12\u00a0345,67")).toBe(12345.67);
+    expect(formatter.formatAmount(12345.67, "EUR")).toContain("€");
+    expect(formatter.formatAmount(12345.67, "USD")).toContain("USD");
+    expect(formatter.formatCalendarDate("2026-07-10", { dateStyle: "short" })).toBe("10.07.2026");
+    expect(formatter.parseDate("10.07.2026")).toEqual(new Date(2026, 6, 10));
+  });
 
   it.each(["it-IT", "pt-BR", "nl-NL", "ar-EG", "fa-IR"])(
     "supports the arbitrary system locale %s in date-fns calendars",

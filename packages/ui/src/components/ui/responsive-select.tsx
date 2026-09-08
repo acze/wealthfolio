@@ -33,17 +33,18 @@ export function ResponsiveSelect({
   value,
   onValueChange,
   options,
-  placeholder = "Select an option",
+  placeholder,
   disabled,
   triggerClassName,
   contentClassName,
-  sheetTitle = "Select Option",
+  sheetTitle,
   sheetDescription,
   mobileSide = "bottom",
   displayMode = "auto",
   useIsMobile,
 }: ResponsiveSelectProps) {
   const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("ui:select.placeholder", "Select an option");
   const useIsMobileHook = useIsMobile ?? defaultUseIsMobile;
   const isMobile = displayMode === "mobile" || (displayMode === "auto" && useIsMobileHook());
   const [open, setOpen] = React.useState(false);
@@ -58,7 +59,7 @@ export function ResponsiveSelect({
   };
 
   if (isMobile) {
-    const displayText = selectedOption ? selectedOption.label : placeholder;
+    const displayText = selectedOption ? selectedOption.label : resolvedPlaceholder;
 
     return (
       <>
@@ -80,7 +81,7 @@ export function ResponsiveSelect({
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side={mobileSide} className="rounded-t-4xl mx-1 h-[80vh] p-0">
             <SheetHeader className="border-border border-b px-6 pb-4 pt-6">
-              <SheetTitle>{sheetTitle}</SheetTitle>
+              <SheetTitle>{sheetTitle ?? t("ui:select.title", "Select Option")}</SheetTitle>
               {sheetDescription ? <SheetDescription>{sheetDescription}</SheetDescription> : null}
             </SheetHeader>
 
@@ -130,7 +131,7 @@ export function ResponsiveSelect({
   return (
     <Select value={value} onValueChange={handleSelect} disabled={disabled}>
       <SelectTrigger className={cn("w-full", triggerClassName)}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={resolvedPlaceholder} />
       </SelectTrigger>
       <SelectContent className={contentClassName}>
         {options.map((option) => (

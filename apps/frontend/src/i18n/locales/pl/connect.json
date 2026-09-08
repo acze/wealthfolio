@@ -1,0 +1,320 @@
+{
+  "page": {
+    "title": "Synchronizacja i połączenia",
+    "subtitle": "Twoje urządzenia w jednym miejscu.",
+    "subtitleWithBrokers": "Twoi brokerzy i urządzenia w jednym miejscu.",
+    "brokerages": "Brokerzy",
+    "devices": "Urządzenia",
+    "recentActivity": "Ostatnia aktywność",
+    "manage": "Zarządzaj",
+    "timeAgo": "{{time}} temu",
+    "noBrokeragesConnected": "Brak połączonych brokerów",
+    "noBrokeragesDescription": "Połącz brokera, aby rozpocząć synchronizację rachunków.",
+    "noDevicesSyncing": "Żadne urządzenia nie są jeszcze synchronizowane",
+    "noDevicesDescription": "Skonfiguruj synchronizację urządzeń w ustawieniach, aby synchronizować dane między urządzeniami.",
+    "noActivity": "Brak aktywności",
+    "noActivityDescription": "Aktualizacje pojawią się tutaj, gdy rozpocznie się synchronizacja danych."
+  },
+  "emptyState": {
+    "optional": "Opcjonalne",
+    "subtitle": "Automatycznie synchronizuj dane z brokerami, dbając o swoją prywatność.",
+    "getStarted": "Zacznij korzystać z Connect",
+    "loginToAccount": "Zaloguj się na swoje konto",
+    "learnMore": "Dowiedz się więcej o Connect",
+    "features": {
+      "brokerageSync": {
+        "title": "Synchronizacja z brokerami",
+        "description": "Codzienna automatyczna synchronizacja rachunków i transakcji."
+      },
+      "deviceSync": {
+        "title": "Synchronizacja urządzeń",
+        "description": "Synchronizacja między urządzeniami z szyfrowaniem E2E."
+      },
+      "householdView": {
+        "title": "Widok gospodarstwa domowego",
+        "description": "Udostępniaj rachunki członkom rodziny."
+      }
+    }
+  },
+  "flow": {
+    "yourDevice": "Twoje urządzenie",
+    "localDatabase": "Lokalna baza danych",
+    "dataStaysHere": "Dane pozostają tutaj",
+    "aggregators": "Agregatorzy",
+    "brokerages": "Brokerzy",
+    "banks": "Banki",
+    "crypto": "Kryptowaluty"
+  },
+  "account": {
+    "userAvatar": "Awatar użytkownika",
+    "userFallback": "Użytkownik",
+    "active": "Aktywne",
+    "signOut": "Wyloguj się",
+    "signOutTitle": "Wylogować się z Wealthfolio Connect?",
+    "signOutMessage": "Aby uzyskać dostęp do zsynchronizowanych rachunków maklerskich, trzeba będzie zalogować się ponownie. Nie wpłynie to na Twoje lokalne dane.",
+    "signOutConfirm": "Wyloguj się",
+    "signingOut": "Wylogowywanie..."
+  },
+  "accounts": {
+    "title": "Rachunki",
+    "manage": "Zarządzaj rachunkami",
+    "accountFallback": "Rachunek",
+    "platformFallback": "Platforma",
+    "brokerFallback": "Broker",
+    "paper": "Demonstracyjny",
+    "shared": "Udostępniony",
+    "sharedBy": "Udostępniony przez {{name}}",
+    "syncEnabled": "Synchronizacja włączona",
+    "excludedFromSync": "Wykluczony z synchronizacji",
+    "noDataYet": "Brak danych",
+    "dataAsOf": "Dane na dzień {{date}}",
+    "emptyTitle": "Brak zsynchronizowanych rachunków",
+    "emptyDescription": "Połącz brokera, aby rozpocząć synchronizację rachunków."
+  },
+  "connections": {
+    "title": "Połączenia z brokerami",
+    "manage": "Zarządzaj połączeniami",
+    "empty": "Brak połączeń z brokerami",
+    "connectBroker": "Połącz brokera",
+    "unknownBroker": "Nieznany broker",
+    "unknown": "Nieznany",
+    "connected": "Połączono",
+    "disconnected": "Rozłączono",
+    "reconnect": "Połącz ponownie",
+    "noAccountsFound": "Nie znaleziono rachunków",
+    "allAccountsExcluded": "Wszystkie rachunki wykluczone",
+    "accountsSyncing_one": "Synchronizowanie {{count}} rachunku",
+    "accountsSyncing_few": "Synchronizowanie {{count}} rachunków",
+    "accountsSyncing_many": "Synchronizowanie {{count}} rachunków",
+    "accountsSyncing_other": "Synchronizowanie {{count}} rachunku",
+    "partialSyncing_one": "Synchronizowane rachunki: {{syncing}} z {{total}} · {{excluded}} rachunek wykluczony",
+    "partialSyncing_few": "Synchronizowane rachunki: {{syncing}} z {{total}} · {{excluded}} rachunki wykluczone",
+    "partialSyncing_many": "Synchronizowane rachunki: {{syncing}} z {{total}} · {{excluded}} rachunków wykluczonych",
+    "partialSyncing_other": "Synchronizowane rachunki: {{syncing}} z {{total}} · wykluczono {{excluded}} rachunku"
+  },
+  "sync": {
+    "syncNow": "Synchronizuj teraz",
+    "sync": "Synchronizuj",
+    "syncAll": "Synchronizuj wszystko",
+    "syncingShort": "Synchronizowanie...",
+    "statusTitle": "Stan synchronizacji",
+    "syncingBrokerData": "Synchronizowanie danych brokera...",
+    "startFailed": "Nie udało się rozpocząć synchronizacji: {{error}}",
+    "needAttention_one": "{{count}} rachunek wymaga uwagi",
+    "needAttention_few": "{{count}} rachunki wymagają uwagi",
+    "needAttention_many": "{{count}} rachunków wymaga uwagi",
+    "needAttention_other": "{{count}} rachunku wymaga uwagi"
+  },
+  "status": {
+    "upToDate": "Aktualne",
+    "syncing": "Synchronizowanie",
+    "syncingEllipsis": "Synchronizowanie...",
+    "needsReview": "Wymaga sprawdzenia",
+    "failed": "Niepowodzenie",
+    "notConnected": "Nie połączono",
+    "lastSynced": "Ostatnia synchronizacja: {{time}}",
+    "neverSynced": "Nigdy nie synchronizowano"
+  },
+  "runStatus": {
+    "running": "W toku",
+    "applied": "Zastosowano",
+    "needsReview": "Wymaga sprawdzenia",
+    "failed": "Niepowodzenie",
+    "cancelled": "Anulowano"
+  },
+  "syncRuns": {
+    "title": "Ostatnie synchronizacje",
+    "empty": "Brak synchronizacji.",
+    "warningsCount_one": "{{count}} ostrzeżenie",
+    "warningsCount_few": "{{count}} ostrzeżenia",
+    "warningsCount_many": "{{count}} ostrzeżeń",
+    "warningsCount_other": "{{count}} ostrzeżenia",
+    "fetched": "Pobrano",
+    "inserted": "Dodano",
+    "updated": "Zaktualizowano",
+    "skipped": "Pominięto",
+    "warningsLabel": "Ostrzeżenia:",
+    "andMore": "... i {{count}} więcej",
+    "reviewActivities": "Sprawdź operacje",
+    "duration": "Czas trwania:",
+    "inProgress": "W toku...",
+    "andMore_one": "... i {{count}} więcej",
+    "andMore_few": "... i {{count}} więcej",
+    "andMore_many": "... i {{count}} więcej",
+    "andMore_other": "... i {{count}} więcej"
+  },
+  "syncHistory": {
+    "title": "Historia synchronizacji",
+    "success": "Powodzenie",
+    "review": "Sprawdź",
+    "emptyTitle": "Brak synchronizacji",
+    "emptyDescription": "Historia synchronizacji pojawi się tutaj po pierwszej synchronizacji",
+    "runCount_one": "{{count}} uruchomienie",
+    "runCount_few": "{{count}} uruchomienia",
+    "runCount_many": "{{count}} uruchomień",
+    "runCount_other": "{{count}} uruchomienia",
+    "loadMore": "Wczytaj więcej",
+    "lessThanOneSecond": "<1s",
+    "new": "nowe",
+    "updated": "zaktualizowane",
+    "skipped": "pominięte",
+    "warningsCount_one": "{{count}} ostrzeżenie",
+    "warningsCount_few": "{{count}} ostrzeżenia",
+    "warningsCount_many": "{{count}} ostrzeżeń",
+    "warningsCount_other": "{{count}} ostrzeżenia",
+    "andMore": "+{{count}} więcej",
+    "andMore_one": "+{{count}} więcej",
+    "andMore_few": "+{{count}} więcej",
+    "andMore_many": "+{{count}} więcej",
+    "andMore_other": "+{{count}} więcej"
+  },
+  "activity": {
+    "syncingData": "Synchronizowanie danych...",
+    "somethingWentWrong": "Coś poszło nie tak",
+    "upToDate": "Wszystko jest aktualne",
+    "itemsNeedReview_one": "{{count}} element wymaga sprawdzenia",
+    "itemsNeedReview_few": "{{count}} elementy wymagają sprawdzenia",
+    "itemsNeedReview_many": "{{count}} elementów wymaga sprawdzenia",
+    "itemsNeedReview_other": "{{count}} elementu wymaga sprawdzenia",
+    "newItems": {
+      "transaction_one": "{{count}} nowa transakcja",
+      "transaction_few": "{{count}} nowe transakcje",
+      "transaction_many": "{{count}} nowych transakcji",
+      "transaction_other": "{{count}} nowej transakcji",
+      "position_one": "{{count}} nowa pozycja",
+      "position_few": "{{count}} nowe pozycje",
+      "position_many": "{{count}} nowych pozycji",
+      "position_other": "{{count}} nowej pozycji"
+    },
+    "updatedItems": {
+      "transaction_one": "Zaktualizowano {{count}} transakcję",
+      "transaction_few": "Zaktualizowano {{count}} transakcje",
+      "transaction_many": "Zaktualizowano {{count}} transakcji",
+      "transaction_other": "Zaktualizowano {{count}} transakcji",
+      "position_one": "Zaktualizowano {{count}} pozycję",
+      "position_few": "Zaktualizowano {{count}} pozycje",
+      "position_many": "Zaktualizowano {{count}} pozycji",
+      "position_other": "Zaktualizowano {{count}} pozycji"
+    },
+    "removedItems": {
+      "transaction_one": "Usunięto {{count}} transakcję",
+      "transaction_few": "Usunięto {{count}} transakcje",
+      "transaction_many": "Usunięto {{count}} transakcji",
+      "transaction_other": "Usunięto {{count}} transakcji",
+      "position_one": "Usunięto {{count}} pozycję",
+      "position_few": "Usunięto {{count}} pozycje",
+      "position_many": "Usunięto {{count}} pozycji",
+      "position_other": "Usunięto {{count}} pozycji"
+    }
+  },
+  "attention": {
+    "title": "Synchronizacja z brokerem wymaga uwagi",
+    "description_one": "{{count}} rachunek wymaga ponownej próby lub sprawdzenia u brokera.",
+    "description_few": "{{count}} rachunki wymagają ponownej próby lub sprawdzenia u brokera.",
+    "description_many": "{{count}} rachunków wymaga ponownej próby lub sprawdzenia u brokera.",
+    "description_other": "{{count}} rachunku wymaga ponownej próby lub sprawdzenia u brokera."
+  },
+  "setup": {
+    "newAccountsTitle": "Nowe rachunki wymagają konfiguracji",
+    "newAccountsDescription_one": "{{count}} rachunek wymaga krótkiej konfiguracji przed rozpoczęciem synchronizacji.",
+    "newAccountsDescription_few": "{{count}} rachunki wymagają krótkiej konfiguracji przed rozpoczęciem synchronizacji.",
+    "newAccountsDescription_many": "{{count}} rachunków wymaga krótkiej konfiguracji przed rozpoczęciem synchronizacji.",
+    "newAccountsDescription_other": "{{count}} rachunku wymaga krótkiej konfiguracji przed rozpoczęciem synchronizacji.",
+    "reviewAccounts": "Sprawdź rachunki"
+  },
+  "devices": {
+    "thisDevice": "To urządzenie",
+    "activeNow": "Teraz aktywne",
+    "lastSeen": "Ostatnio widziane: {{time}}",
+    "online": "Online",
+    "never": "Nigdy"
+  },
+  "deviceStatus": {
+    "syncError": "Błąd synchronizacji",
+    "syncPaused": "Synchronizacja wstrzymana",
+    "upToDate": "Aktualne",
+    "syncing": "Synchronizowanie"
+  },
+  "serviceUnavailable": {
+    "title": "Usługa tymczasowo niedostępna",
+    "description": "Mamy problem z połączeniem z Wealthfolio Connect. Zwykle jest to sytuacja tymczasowa, która powinna wkrótce ustąpić.",
+    "retrying": "Ponawianie...",
+    "tryAgain": "Spróbuj ponownie"
+  },
+  "upgrade": {
+    "title": "Zmień plan na wyższy, aby synchronizować rachunki maklerskie",
+    "description": "Połącz rachunki maklerskie, aby automatycznie synchronizować portfel.",
+    "button": "Zmień plan na wyższy"
+  },
+  "privacy": {
+    "footnote": "Wealthfolio Connect nie przechowuje Twoich danych logowania do brokerów ani danych finansowych. Wszystko jest bezpiecznie synchronizowane przez agregatora z Twoją lokalną bazą danych. Synchronizacja urządzeń korzysta z szyfrowania end-to-end. <privacyLink>Dowiedz się więcej</privacyLink>"
+  },
+  "providers": {
+    "continueWithGoogle": "Kontynuuj z Google",
+    "continueWithApple": "Kontynuuj z Apple",
+    "continueWithEmail": "Kontynuuj przez e-mail",
+    "lastUsed": "Ostatnio używane"
+  },
+  "subscription": {
+    "comingSoon": "Wkrótce",
+    "getStarted": "Rozpocznij",
+    "perMonthShort": "mies.",
+    "perYearShort": "rok",
+    "savings": "Oszczędź {{percent}}% względem planu miesięcznego",
+    "choosePlan": "Wybierz plan",
+    "choosePlanDescription": "Wykup subskrypcję, aby odblokować synchronizację z brokerami i funkcje chmurowe.",
+    "monthly": "Miesięczny",
+    "yearly": "Roczny",
+    "monthlyBilling": "Rozliczenie miesięczne",
+    "yearlyBilling": "Rozliczenie roczne",
+    "alreadySubscribed": "Masz już subskrypcję?",
+    "connectionIssueTitle": "Problem z połączeniem",
+    "connectionIssueDescription": "Mamy problem z połączeniem z Twoim kontem. Może się tak zdarzyć, gdy sesja wygasła.",
+    "unableToLoadTitle": "Nie można wczytać planów",
+    "unableToLoadDescription": "Nie udało się teraz pobrać planów subskrypcji. Zwykle jest to problem tymczasowy.",
+    "contactSupport": "Skontaktuj się z pomocą techniczną",
+    "emailCopied": "Adres e-mail skopiowany do schowka",
+    "reconnecting": "Ponowne łączenie...",
+    "reconnect": "Połącz ponownie",
+    "refreshPage": "Odśwież stronę"
+  },
+  "authCallback": {
+    "processing": "Przetwarzanie uwierzytelnienia...",
+    "completing": "Kończenie logowania..."
+  },
+  "authErrors": {
+    "noSessionReturned": "Nie zwrócono sesji po ukończeniu logowania.",
+    "completeSignInFailed": "Nie udało się dokończyć logowania",
+    "signInFailed": "Logowanie nie powiodło się",
+    "signUpFailed": "Rejestracja nie powiodła się",
+    "confirmEmail": "Sprawdź pocztę e-mail, aby potwierdzić konto.",
+    "oauthFailed": "Logowanie OAuth nie powiodło się",
+    "magicLinkFailed": "Nie udało się wysłać linku do logowania",
+    "invalidVerificationCode": "Nieprawidłowy kod weryfikacyjny",
+    "signOutFailed": "Wylogowanie nie powiodło się",
+    "fetchUserInfoFailed": "Nie udało się pobrać informacji o użytkowniku"
+  },
+  "newAccounts": {
+    "title": "Znaleziono nowe rachunki",
+    "description": "Wybierz sposób śledzenia każdego rachunku. Możesz to później zmienić.",
+    "trackingInfo": "Tryb <strong>Transakcje</strong> śledzi każdą transakcję, zapewniając pełną analizę wyników. Tryb <strong>Pozycje</strong> importuje tylko migawki i oferuje ograniczony zestaw wskaźników. <docsLink>Dowiedz się więcej</docsLink>",
+    "accountName": "Nazwa rachunku",
+    "group": "Grupa (opcjonalnie)",
+    "groupPlaceholder": "np. Emerytura",
+    "trackingMode": "Tryb śledzenia",
+    "transactions": "Transakcje",
+    "transactionsDescription": "Pełna analiza wyników",
+    "holdings": "Pozycje",
+    "holdingsDescription": "Tylko migawki",
+    "holdingsWarning": "Wskaźniki wyników będą ograniczone bez historii transakcji.",
+    "notNow": "Nie teraz",
+    "saving": "Zapisywanie...",
+    "saveAndSync": "Zapisz i synchronizuj",
+    "configured": "Rachunki skonfigurowane",
+    "configuredDescription": "Rozpoczynanie synchronizacji z wybranymi ustawieniami...",
+    "saveFailed": "Nie udało się zapisać rachunków"
+  },
+  "errors": {
+    "unknown": "Nieznany błąd"
+  }
+}

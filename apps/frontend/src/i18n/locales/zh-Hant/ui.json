@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "選擇一個選項",
+    "title": "選擇選項"
+  },
+  "progress": {
+    "title": "正在處理",
+    "description": "正在處理您的請求，請稍候。這可能需要一些時間。",
+    "message": "正在處理..."
+  },
+  "budget": {
+    "overBudget": "超出預算 {{percent}}%",
+    "onTrack": "符合預期",
+    "used": "已使用 {{percent}}%"
+  },
   "carousel": {
+    "view": "檢視 {{number}}",
+    "goTo": "前往{{name}}",
+    "goToView": "前往檢視 {{number}}",
     "previous": "上一張",
     "next": "下一張"
   },
   "currency": {
+    "placeholder": "選擇帳戶幣別",
+    "popular": "常用",
     "selectTitle": "選擇貨幣",
     "selectDescription": "選擇您的活動貨幣",
     "more": "更多",
@@ -15,6 +34,10 @@
     "noneFoundShort": "找不到貨幣。"
   },
   "dataGrid": {
+    "copyFailed": "無法複製到剪貼簿",
+    "cutFailed": "無法剪下到剪貼簿",
+    "pasteFailed": "貼上失敗，請重試。",
+    "pasteSkipped": "因資料無效而略過的儲存格數：{{count}}",
     "label": "資料網格",
     "addRow": "新增行",
     "sortAsc": "遞增排序",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "確認",
+    "delete": "刪除",
+    "pending": "進行中...",
     "close": "關閉",
     "cancel": "取消",
     "continue": "繼續",

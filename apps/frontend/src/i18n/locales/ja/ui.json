@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "オプションを選択",
+    "title": "オプションを選択"
+  },
+  "progress": {
+    "title": "処理中",
+    "description": "リクエストを処理しています。少し時間がかかる場合がありますので、そのままお待ちください。",
+    "message": "処理中..."
+  },
+  "budget": {
+    "overBudget": "予算を{{percent}}%超過",
+    "onTrack": "予定どおり",
+    "used": "{{percent}}%使用済み"
+  },
   "carousel": {
+    "view": "ビュー {{number}}",
+    "goTo": "{{name}}に移動",
+    "goToView": "ビュー {{number}}に移動",
     "previous": "前のスライド",
     "next": "次のスライド"
   },
   "currency": {
+    "placeholder": "口座の通貨を選択",
+    "popular": "よく使う通貨",
     "selectTitle": "通貨を選択",
     "selectDescription": "取引の通貨を選択してください",
     "more": "もっと見る",
@@ -15,6 +34,10 @@
     "noneFoundShort": "通貨が見つかりません。"
   },
   "dataGrid": {
+    "copyFailed": "クリップボードへのコピーに失敗しました",
+    "cutFailed": "クリップボードへの切り取りに失敗しました",
+    "pasteFailed": "貼り付けに失敗しました。もう一度お試しください。",
+    "pasteSkipped": "無効なデータのためスキップしたセル数：{{count}}",
     "label": "データグリッド",
     "addRow": "行を追加",
     "sortAsc": "昇順で並べ替え",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "確認",
+    "delete": "削除",
+    "pending": "実行中...",
     "close": "閉じる",
     "cancel": "キャンセル",
     "continue": "続ける",

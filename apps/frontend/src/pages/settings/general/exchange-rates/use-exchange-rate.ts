@@ -10,12 +10,18 @@ import { QueryKeys } from "@/lib/query-keys";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { ExchangeRate } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { worldCurrencies } from "@wealthfolio/ui";
+import { getLocalizedCurrencyOptions, worldCurrencies } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 
 export function useExchangeRates() {
+  const { i18n } = useTranslation();
   const queryClient = useQueryClient();
+  const currencies = getLocalizedCurrencyOptions(
+    worldCurrencies,
+    i18n.resolvedLanguage || i18n.language,
+  );
   const getCurrencyName = (code: string) => {
-    const currency = worldCurrencies.find((c) => c.value === code);
+    const currency = currencies.find((c) => c.value === code);
     return currency ? currency.label.split(" (")[0] : code;
   };
 
@@ -23,16 +29,10 @@ export function useExchangeRates() {
     queryKey: [QueryKeys.EXCHANGE_RATES],
     queryFn: async () => {
       const rates = await getExchangeRates();
-      const processedRates = rates.map((rate) => ({
-        ...rate,
-        fromCurrencyName: getCurrencyName(rate.fromCurrency),
-        toCurrencyName: getCurrencyName(rate.toCurrency),
-      }));
-
       // For manual rates, keep only from->to and filter out the reverse
-      return processedRates.filter((rate) => {
+      return rates.filter((rate) => {
         if (rate.source === "MANUAL") {
-          const reverseManualRate = processedRates.find(
+          const reverseManualRate = rates.find(
             (r) =>
               r.fromCurrency === rate.toCurrency &&
               r.toCurrency === rate.fromCurrency &&
@@ -43,6 +43,12 @@ export function useExchangeRates() {
         return true; // Keep all non-manual rates
       });
     },
+    select: (rates) =>
+      rates.map((rate) => ({
+        ...rate,
+        fromCurrencyName: getCurrencyName(rate.fromCurrency),
+        toCurrencyName: getCurrencyName(rate.toCurrency),
+      })),
   });
 
   const updateExchangeRateMutation = useMutation({

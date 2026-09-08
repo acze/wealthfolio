@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "Sélectionner une option",
+    "title": "Sélectionner une option"
+  },
+  "progress": {
+    "title": "Traitement en cours",
+    "description": "Veuillez patienter pendant le traitement de votre demande. Cela peut prendre quelques instants.",
+    "message": "Traitement en cours..."
+  },
+  "budget": {
+    "overBudget": "{{percent}} % au-dessus du budget",
+    "onTrack": "Dans les limites du budget",
+    "used": "{{percent}} % utilisé"
+  },
   "carousel": {
+    "view": "Vue {{number}}",
+    "goTo": "Aller à {{name}}",
+    "goToView": "Aller à la vue {{number}}",
     "previous": "Diapositive précédente",
     "next": "Diapositive suivante"
   },
   "currency": {
+    "placeholder": "Sélectionner la devise du compte",
+    "popular": "Devises courantes",
     "selectTitle": "Sélectionner une devise",
     "selectDescription": "Choisissez la devise de votre activité",
     "more": "Plus",
@@ -15,6 +34,10 @@
     "noneFoundShort": "Aucune devise trouvée."
   },
   "dataGrid": {
+    "copyFailed": "Impossible de copier dans le presse-papiers",
+    "cutFailed": "Impossible de couper vers le presse-papiers",
+    "pasteFailed": "Impossible de coller. Veuillez réessayer.",
+    "pasteSkipped": "Cellules ignorées en raison de données invalides : {{count}}",
     "label": "Grille de données",
     "addRow": "Ajouter une ligne",
     "sortAsc": "Tri croissant",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "Confirmer",
+    "delete": "Supprimer",
+    "pending": "En cours...",
     "close": "Fermer",
     "cancel": "Annuler",
     "continue": "Continuer",

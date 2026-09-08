@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "Selecionar uma opção",
+    "title": "Selecionar uma opção"
+  },
+  "progress": {
+    "title": "Processando",
+    "description": "Aguarde enquanto processamos sua solicitação. Isso pode levar alguns instantes.",
+    "message": "Processando..."
+  },
+  "budget": {
+    "overBudget": "{{percent}}% acima do orçamento",
+    "onTrack": "Dentro do previsto",
+    "used": "{{percent}}% utilizado"
+  },
   "carousel": {
+    "view": "Visualização {{number}}",
+    "goTo": "Ir para {{name}}",
+    "goToView": "Ir para a visualização {{number}}",
     "previous": "Slide anterior",
     "next": "Próximo slide"
   },
   "currency": {
+    "placeholder": "Selecionar a moeda da conta",
+    "popular": "Populares",
     "selectTitle": "Selecionar moeda",
     "selectDescription": "Escolha a moeda da sua atividade",
     "more": "Mais",
@@ -15,6 +34,10 @@
     "noneFoundShort": "Nenhuma moeda encontrada."
   },
   "dataGrid": {
+    "copyFailed": "Não foi possível copiar para a área de transferência",
+    "cutFailed": "Não foi possível recortar para a área de transferência",
+    "pasteFailed": "Não foi possível colar. Tente novamente.",
+    "pasteSkipped": "Células ignoradas devido a dados inválidos: {{count}}",
     "label": "Grade de dados",
     "addRow": "Adicionar linha",
     "sortAsc": "Ordenar crescente",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "Confirmar",
+    "delete": "Excluir",
+    "pending": "Em andamento...",
     "close": "Fechar",
     "cancel": "Cancelar",
     "continue": "Continuar",

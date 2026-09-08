@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { Icons } from "../ui/icons";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
@@ -27,13 +28,14 @@ export function SearchableSelect({
   options = [],
   value,
   onValueChange,
-  placeholder = "Select an option",
+  placeholder,
   disabled = false,
-  searchPlaceholder = "Search...",
-  emptyMessage = "No results found.",
+  searchPlaceholder,
+  emptyMessage,
   className = "",
   contentClassName = "",
 }: SearchableSelectProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
 
   const selectedOption = options?.find((option) => option.value === value);
@@ -48,14 +50,16 @@ export function SearchableSelect({
           className={cn("w-full justify-between rounded-md font-normal", className)}
           disabled={disabled}
         >
-          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+          <span className="truncate">
+            {selectedOption ? selectedOption.label : (placeholder ?? t("ui:select.placeholder", "Select an option"))}
+          </span>
           <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className={cn("w-[var(--radix-popover-trigger-width)] p-0", contentClassName)}>
         <Command>
-          <CommandInput placeholder={searchPlaceholder} className="h-9" />
-          <CommandEmpty>{emptyMessage}</CommandEmpty>
+          <CommandInput placeholder={searchPlaceholder ?? t("ui:dataGrid.search", "Search...")} className="h-9" />
+          <CommandEmpty>{emptyMessage ?? t("ui:faceted.noResults", "No results found.")}</CommandEmpty>
           <CommandGroup className="max-h-64 overflow-auto">
             {options.map((option) => (
               <CommandItem

@@ -179,6 +179,33 @@ export const quoteUnitCurrencies = [
 
 export const quoteCurrencies = [...worldCurrencies, ...quoteUnitCurrencies];
 
+const worldCurrencyCodes = new Set(worldCurrencies.map((currency) => currency.value));
+
+export function getLocalizedCurrencyOptions<T extends { value: string; label: string }>(
+  options: readonly T[],
+  uiLanguage: string,
+): T[] {
+  if (
+    !uiLanguage ||
+    uiLanguage.toLowerCase().split("-")[0] === "en" ||
+    typeof Intl.DisplayNames === "undefined"
+  ) {
+    return [...options];
+  }
+
+  const displayNames = new Intl.DisplayNames([uiLanguage], {
+    type: "currency",
+    fallback: "none",
+  });
+
+  return options.map((option) => {
+    // Match codes exactly: quote units such as GBp must never be interpreted as GBP.
+    if (!worldCurrencyCodes.has(option.value)) return option;
+    const name = displayNames.of(option.value);
+    return name ? { ...option, label: `${name} (${option.value})` } : option;
+  });
+}
+
 export function getQuoteUnitCurrency(currency: string | null | undefined) {
   const trimmed = currency?.trim();
   if (!trimmed) return undefined;

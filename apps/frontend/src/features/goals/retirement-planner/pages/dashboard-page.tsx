@@ -539,7 +539,9 @@ export default function DashboardPage({
               retirementOverview.portfolioAtGoalAge;
             const portfolioAtTarget =
               chartValueMode === "nominal" ? portfolioAtTargetNominal : portfolioAtTargetToday;
-            const monthlyContribLabel = `${formatting.formatCompactAmount(plan.investment.monthlyContribution, currency)}/mo`;
+            const monthlyContribLabel = t("goals:dashboard.coverage.amount_per_mo", {
+              amount: formatting.formatCompactAmount(plan.investment.monthlyContribution, currency),
+            });
             const annualBudgetToday =
               targetReconciliation?.plannedAnnualExpensesTodayValue ?? totalBudget * 12;
             const annualBudgetNominal =

@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "옵션 선택",
+    "title": "옵션 선택"
+  },
+  "progress": {
+    "title": "처리 중",
+    "description": "요청을 처리하는 동안 기다려 주세요. 잠시 시간이 걸릴 수 있습니다.",
+    "message": "처리 중..."
+  },
+  "budget": {
+    "overBudget": "예산 {{percent}}% 초과",
+    "onTrack": "계획대로 진행 중",
+    "used": "{{percent}}% 사용"
+  },
   "carousel": {
+    "view": "보기 {{number}}",
+    "goTo": "{{name}}(으)로 이동",
+    "goToView": "보기 {{number}}(으)로 이동",
     "previous": "이전 슬라이드",
     "next": "다음 슬라이드"
   },
   "currency": {
+    "placeholder": "계좌 통화 선택",
+    "popular": "자주 사용하는 통화",
     "selectTitle": "통화 선택",
     "selectDescription": "활동에 사용할 통화를 선택하세요",
     "more": "더 보기",
@@ -15,6 +34,10 @@
     "noneFoundShort": "통화를 찾을 수 없습니다."
   },
   "dataGrid": {
+    "copyFailed": "클립보드에 복사하지 못했습니다",
+    "cutFailed": "클립보드로 잘라내지 못했습니다",
+    "pasteFailed": "붙여넣지 못했습니다. 다시 시도해 주세요.",
+    "pasteSkipped": "잘못된 데이터로 인해 건너뛴 셀 수: {{count}}",
     "label": "데이터 그리드",
     "addRow": "행 추가",
     "sortAsc": "오름차순 정렬",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "확인",
+    "delete": "삭제",
+    "pending": "진행 중...",
     "close": "닫기",
     "cancel": "취소",
     "continue": "계속",

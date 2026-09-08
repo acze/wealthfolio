@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "选择一个选项",
+    "title": "选择选项"
+  },
+  "progress": {
+    "title": "正在处理",
+    "description": "正在处理您的请求，请稍候。这可能需要一些时间。",
+    "message": "正在处理..."
+  },
+  "budget": {
+    "overBudget": "超出预算 {{percent}}%",
+    "onTrack": "符合预期",
+    "used": "已使用 {{percent}}%"
+  },
   "carousel": {
+    "view": "视图 {{number}}",
+    "goTo": "转到{{name}}",
+    "goToView": "转到视图 {{number}}",
     "previous": "上一张",
     "next": "下一张"
   },
   "currency": {
+    "placeholder": "选择账户币种",
+    "popular": "常用",
     "selectTitle": "选择货币",
     "selectDescription": "选择您的活动货币",
     "more": "更多",
@@ -15,6 +34,10 @@
     "noneFoundShort": "未找到货币。"
   },
   "dataGrid": {
+    "copyFailed": "无法复制到剪贴板",
+    "cutFailed": "无法剪切到剪贴板",
+    "pasteFailed": "粘贴失败，请重试。",
+    "pasteSkipped": "因数据无效而跳过的单元格数：{{count}}",
     "label": "数据网格",
     "addRow": "添加行",
     "sortAsc": "升序排列",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "确认",
+    "delete": "删除",
+    "pending": "进行中...",
     "close": "关闭",
     "cancel": "取消",
     "continue": "继续",

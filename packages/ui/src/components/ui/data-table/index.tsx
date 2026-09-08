@@ -13,6 +13,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icons } from "../icons";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../table";
@@ -82,6 +83,7 @@ export function DataTable<TData, TValue>({
   toolbarActions,
   pinRowsToTop,
 }: DataTableProps<TData, TValue>) {
+  const { t } = useTranslation();
   const [rowSelection, setRowSelection] = React.useState({});
   const [storedColumnVisibility, setColumnVisibility] = storageKey
     ? usePersistentState<VisibilityState>(`${storageKey}:column-visibility`, defaultColumnVisibility || {})
@@ -192,7 +194,7 @@ export function DataTable<TData, TValue>({
                 <TableCell colSpan={columns.length} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <Icons.FileText className="text-muted-foreground mb-2 h-10 w-10" />
-                    <p className="text-muted-foreground text-sm">No results found.</p>
+                    <p className="text-muted-foreground text-sm">{t("ui:faceted.noResults", "No results found.")}</p>
                   </div>
                 </TableCell>
               </TableRow>
