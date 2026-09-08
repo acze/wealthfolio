@@ -1564,6 +1564,7 @@ impl CashActivityServiceTrait for MockCashActivityService {
                 net: None,
                 base_currency: None,
                 analysis: None,
+                selection_snapshot: None,
             },
         )
     }

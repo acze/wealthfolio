@@ -12,6 +12,9 @@ interface TransactionsBulkBarProps {
   onTagEvent: (eventId: string | null) => void;
   onDelete: () => void;
   onClearSelection: () => void;
+  selectionStatus?: "ready" | "pending" | "error";
+  onRetrySelection?: () => void;
+  includesOtherPages?: boolean;
 }
 
 export function TransactionsBulkBar({
@@ -21,19 +24,55 @@ export function TransactionsBulkBar({
   onTagEvent,
   onDelete,
   onClearSelection,
+  selectionStatus = "ready",
+  onRetrySelection,
+  includesOtherPages = false,
 }: TransactionsBulkBarProps) {
   const { t } = useTranslation();
+  if (selectionStatus !== "ready") {
+    return (
+      <div
+        role="region"
+        aria-label={t("spending:transactions.bulkActions")}
+        aria-busy={selectionStatus === "pending"}
+        className="bg-muted/40 ring-border flex flex-wrap items-center justify-between gap-2 rounded-md px-3 py-2 ring-1"
+      >
+        <span role="status" className="text-sm">
+          {t(
+            selectionStatus === "pending"
+              ? "spending:transactions.preparingSelection"
+              : "spending:transactions.selectionLoadFailed",
+          )}
+        </span>
+        <div className="flex gap-2">
+          {selectionStatus === "error" && (
+            <Button size="sm" variant="outline" onClick={onRetrySelection}>
+              {t("common:retry")}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={onClearSelection}>
+            {t("common:clear")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       role="region"
       aria-label={t("spending:transactions.bulkActions")}
       className="bg-muted/40 ring-border flex flex-wrap items-center justify-between gap-2 rounded-md px-3 py-2 ring-1"
     >
-      <div className="text-foreground flex items-center gap-2 text-sm">
+      <div className="text-foreground flex flex-wrap items-center gap-2 text-sm">
         <Icons.Check className="h-4 w-4" aria-hidden="true" />
         <span className="font-medium">
           {t("spending:transactions.selectedCount", { count: selectedCount })}
         </span>
+        {includesOtherPages && (
+          <span className="text-muted-foreground text-xs">
+            {t("spending:transactions.includesOtherPages")}
+          </span>
+        )}
       </div>
       {/* Wraps: on a phone these four buttons do not fit beside the count, and
           without it the last one is cut off at the edge of the screen. */}

@@ -160,6 +160,9 @@ async fn search_cash_activities(
     State(state): State<Arc<AppState>>,
     Json(request): Json<CashActivitySearchRequest>,
 ) -> ApiResult<Json<CashActivitySearchResponse>> {
+    request
+        .validate_selection_snapshot()
+        .map_err(|error| ApiError::BadRequest(error.to_string()))?;
     if !spending_enabled(&state).await? {
         let base_currency = request
             .selection
@@ -169,6 +172,7 @@ async fn search_cash_activities(
             items: Vec::new(),
             total_count: 0,
             net: Some(Default::default()),
+            selection_snapshot: request.include_selection_snapshot.then(Default::default),
             analysis: request
                 .selection
                 .as_ref()

@@ -18,9 +18,9 @@ use super::{
     model::{
         AnalysisTotals, CashActivity, CashActivityAnalysis, CashActivityFilter,
         CashActivitySearchRequest, CashActivitySearchResponse, CashActivitySelection,
-        CashActivitySelectionMode, CashActivitySortField, CashActivityStatusFilter, CashFlowBucket,
-        CurrencyNet, ExactCurrencyAmount, ExactMoneySummary, NetSummary, SortDirection,
-        TransferLinkStatus,
+        CashActivitySelectionMode, CashActivitySelectionSnapshot, CashActivitySortField,
+        CashActivityStatusFilter, CashFlowBucket, CurrencyNet, ExactCurrencyAmount,
+        ExactMoneySummary, NetSummary, SortDirection, TransferLinkStatus,
     },
     CASH_ACTIVITY_TYPES,
 };
@@ -401,6 +401,7 @@ impl CashActivityService {
         base_currency: Option<&str>,
         timezone: &str,
     ) -> Result<CashActivitySearchResponse> {
+        req.validate_selection_snapshot()?;
         let timezone = parse_user_timezone_or_default(timezone);
         let s = self.settings.get().await?;
         if !s.enabled || s.account_ids.is_empty() {
@@ -409,6 +410,7 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
+                selection_snapshot: req.include_selection_snapshot.then(Default::default),
                 analysis: req
                     .selection
                     .as_ref()
@@ -427,6 +429,7 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
+                selection_snapshot: req.include_selection_snapshot.then(Default::default),
                 analysis: req
                     .selection
                     .as_ref()
@@ -448,6 +451,7 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
+                selection_snapshot: req.include_selection_snapshot.then(Default::default),
                 analysis: req
                     .selection
                     .as_ref()
@@ -657,6 +661,21 @@ impl CashActivityService {
         }
 
         let total_count = activities.len();
+        let selection_snapshot = req
+            .selection
+            .as_ref()
+            .filter(|_| req.include_selection_snapshot)
+            .map(|selection| {
+                self.selection_snapshot(
+                    &activities,
+                    selection,
+                    &account_types,
+                    &account_currencies,
+                    &transfer_groups,
+                    base_currency,
+                    timezone,
+                )
+            });
         let analysis = req.selection.as_ref().map(|selection| {
             self.selection_analysis(
                 &activities,
@@ -740,7 +759,62 @@ impl CashActivityService {
             net,
             base_currency: base_currency.map(str::to_string),
             analysis,
+            selection_snapshot,
         })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn selection_snapshot(
+        &self,
+        activities: &[Activity],
+        selection: &CashActivitySelection,
+        account_types: &HashMap<String, String>,
+        account_currencies: &HashMap<String, String>,
+        transfer_groups: &HashSet<String>,
+        base_currency: Option<&str>,
+        timezone: Tz,
+    ) -> CashActivitySelectionSnapshot {
+        let ids: HashSet<&str> = selection.ids.iter().map(String::as_str).collect();
+        let selected: Vec<Activity> = activities
+            .iter()
+            .filter(|activity| match selection.mode {
+                CashActivitySelectionMode::All => !ids.contains(activity.id.as_str()),
+                CashActivitySelectionMode::Explicit => ids.contains(activity.id.as_str()),
+            })
+            .cloned()
+            .collect();
+        let mut net = self.net_summary(
+            &selected,
+            account_types,
+            account_currencies,
+            base_currency,
+            timezone,
+        );
+        let mut currencies: HashSet<String> = net
+            .by_currency
+            .iter()
+            .map(|entry| entry.currency.clone())
+            .collect();
+        let mut cash_flow_buckets = Vec::new();
+        for activity in &selected {
+            // Restore labels only after conversion so zero-native FX residuals
+            // retain the existing NetSummary policy.
+            if currencies.insert(activity.currency.clone()) {
+                net.by_currency.push(CurrencyNet {
+                    currency: activity.currency.clone(),
+                    amount: 0.0,
+                });
+            }
+            let bucket = cash_flow_bucket_for(activity, account_types, transfer_groups);
+            if !cash_flow_buckets.contains(&bucket) {
+                cash_flow_buckets.push(bucket);
+            }
+        }
+        CashActivitySelectionSnapshot {
+            ids: selected.into_iter().map(|activity| activity.id).collect(),
+            net,
+            cash_flow_buckets,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2388,6 +2462,585 @@ mod tests {
             limit: 0,
             ..Default::default()
         }
+    }
+
+    fn snapshot_request(
+        mode: CashActivitySelectionMode,
+        ids: &[&str],
+    ) -> CashActivitySearchRequest {
+        CashActivitySearchRequest {
+            include_selection_snapshot: true,
+            ..analysis_request(mode, ids)
+        }
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_materializes_whole_selection_without_changing_pages() {
+        for count in [73, 1_207] {
+            let rows: Vec<_> = (0..count)
+                .map(|i| {
+                    let mut row = cash_row(&format!("row-{i:04}"), "WITHDRAWAL", i + 1, "USD");
+                    row.activity_date = "2026-01-01T12:00:00Z".parse().unwrap();
+                    row
+                })
+                .collect();
+            let original_rows = serde_json::to_value(&rows).unwrap();
+            let expected_ids: Vec<_> = rows
+                .iter()
+                .filter(|row| !["row-0001", "row-0061", "row-1205"].contains(&row.id.as_str()))
+                .map(|row| row.id.clone())
+                .collect();
+            let selected_amount: Decimal = rows
+                .iter()
+                .filter(|row| expected_ids.contains(&row.id))
+                .map(|row| -row.amount.unwrap())
+                .sum();
+            let (service, assignments, splits) = make_service_with(rows);
+            for mode in [
+                CashActivitySelectionMode::All,
+                CashActivitySelectionMode::Explicit,
+            ] {
+                let mut request = snapshot_request(
+                    mode,
+                    &["row-0001", "row-0061", "row-1205", "unknown", "row-0001"],
+                );
+                if mode == CashActivitySelectionMode::Explicit {
+                    let mut ids = expected_ids.clone();
+                    ids.extend(["unknown".to_string(), expected_ids[0].clone()]);
+                    request.selection.as_mut().unwrap().ids = ids;
+                }
+                for (offset, limit) in [(0, 0), (0, 50), (60, 50), (1_500, 0)] {
+                    request.offset = offset;
+                    request.limit = limit;
+                    let response = service
+                        .search(request.clone(), Some("USD"), "UTC")
+                        .await
+                        .unwrap();
+                    let snapshot = response.selection_snapshot.as_ref().unwrap();
+                    assert_eq!(snapshot.ids, expected_ids);
+                    assert_eq!(
+                        snapshot.ids.len(),
+                        response.analysis.as_ref().unwrap().selected.count
+                    );
+                    assert_eq!(
+                        snapshot.net.by_currency,
+                        vec![CurrencyNet {
+                            currency: "USD".into(),
+                            amount: decimal_to_f64(selected_amount),
+                        }]
+                    );
+                    assert_eq!(snapshot.net.converted, None);
+                    assert_eq!(snapshot.cash_flow_buckets, [CashFlowBucket::Spending]);
+
+                    let mut without_snapshot = request.clone();
+                    without_snapshot.include_selection_snapshot = false;
+                    let original = service
+                        .search(without_snapshot, Some("USD"), "UTC")
+                        .await
+                        .unwrap();
+                    assert!(original.selection_snapshot.is_none());
+                    let mut projected_json = serde_json::to_value(response).unwrap();
+                    projected_json
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("selectionSnapshot");
+                    assert_eq!(projected_json, serde_json::to_value(original).unwrap());
+                }
+            }
+            assert_eq!(
+                serde_json::to_value(service.activity_repo.get_activities().unwrap()).unwrap(),
+                original_rows
+            );
+            assert!(assignments.cleared.lock().unwrap().is_empty());
+            assert!(splits.replaced.lock().unwrap().is_empty());
+            assert!(splits.assignment_clears.lock().unwrap().is_empty());
+            assert!(splits.cleared.lock().unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_ignores_unknown_and_out_of_filter_ids() {
+        let mut included = cash_row("included", "WITHDRAWAL", 11, "USD");
+        included.notes = Some("synthetic match".into());
+        let filtered = cash_row("filtered", "WITHDRAWAL", 99, "USD");
+        let mut outside_account = included.clone();
+        outside_account.id = "outside-account".into();
+        outside_account.account_id = "not-opted-in".into();
+        let (service, _, _) = make_service_with(vec![included, filtered, outside_account]);
+        for (mode, ids, expected_ids) in [
+            (
+                CashActivitySelectionMode::Explicit,
+                vec![
+                    "included",
+                    "included",
+                    "unknown",
+                    "filtered",
+                    "outside-account",
+                ],
+                vec!["included"],
+            ),
+            (
+                CashActivitySelectionMode::Explicit,
+                vec!["filtered", "unknown"],
+                vec![],
+            ),
+            (CashActivitySelectionMode::Explicit, vec![], vec![]),
+            (
+                CashActivitySelectionMode::All,
+                vec!["filtered", "unknown"],
+                vec!["included"],
+            ),
+            (
+                CashActivitySelectionMode::All,
+                vec!["included", "included"],
+                vec![],
+            ),
+        ] {
+            let mut request = snapshot_request(mode, &ids);
+            request.search = Some("MATCH".into());
+            let response = service.search(request, Some("USD"), "UTC").await.unwrap();
+            let snapshot = response.selection_snapshot.unwrap();
+            assert_eq!(snapshot.ids, expected_ids);
+            assert_eq!(
+                snapshot.ids.len(),
+                response.analysis.unwrap().selected.count
+            );
+            if expected_ids.is_empty() {
+                assert_eq!(snapshot, CashActivitySelectionSnapshot::default());
+            } else {
+                assert_eq!(snapshot.net.by_currency[0].amount, -11.0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_category_filter_keeps_whole_transaction_net() {
+        let mut refund = cash_row("refund", "CREDIT", 20, "USD");
+        refund.subtype = Some("REFUND".into());
+        let (service, assignments, splits) = make_service_with(vec![
+            cash_row("expense", "WITHDRAWAL", 120, "USD"),
+            refund,
+            cash_row("filtered", "WITHDRAWAL", 500, "USD"),
+        ]);
+        *assignments.assignments.lock().unwrap() = vec![assignment_row("filtered", "other")];
+        *splits.splits.lock().unwrap() = vec![
+            split_row("expense", "groceries", "40"),
+            split_row("expense", "other", "80"),
+            split_row("refund", "groceries", "5"),
+            split_row("refund", "other", "15"),
+        ];
+        let original_splits = serde_json::to_value(&*splits.splits.lock().unwrap()).unwrap();
+        let mut request = snapshot_request(CashActivitySelectionMode::All, &["filtered"]);
+        request.category_ids = Some(vec!["groceries".into(), "other".into()]);
+        request.subcategory_ids = Some(vec!["groceries".into()]);
+        request.status = CashActivityStatusFilter::Categorized;
+        let response = service.search(request, Some("USD"), "UTC").await.unwrap();
+        let snapshot = response.selection_snapshot.unwrap();
+        assert_eq!(snapshot.ids.len(), 2);
+        assert!(snapshot.ids.contains(&"expense".to_string()));
+        assert!(snapshot.ids.contains(&"refund".to_string()));
+        assert_eq!(
+            snapshot.net.by_currency,
+            vec![CurrencyNet {
+                currency: "USD".into(),
+                amount: -100.0
+            }]
+        );
+        assert_eq!(
+            response
+                .analysis
+                .unwrap()
+                .selected
+                .spending
+                .converted
+                .unwrap()
+                .amount,
+            "35"
+        );
+        assert_eq!(snapshot.cash_flow_buckets, [CashFlowBucket::Spending]);
+        assert_eq!(
+            serde_json::to_value(&*splits.splits.lock().unwrap()).unwrap(),
+            original_splits
+        );
+        assert!(assignments.cleared.lock().unwrap().is_empty());
+        assert!(splits.replaced.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_restores_nonbase_and_independent_zero_currencies() {
+        for mixed in [false, true] {
+            let mut rows = vec![
+                cash_row("eur-in", "DEPOSIT", 10, "EUR"),
+                cash_row("eur-out", "WITHDRAWAL", 10, "EUR"),
+                cash_row("unselected", "WITHDRAWAL", 30, "JPY"),
+            ];
+            if mixed {
+                rows.extend([
+                    cash_row("gbp-in", "DEPOSIT", 20, "GBP"),
+                    cash_row("gbp-out", "WITHDRAWAL", 20, "GBP"),
+                    cash_row("zero-cad", "WITHDRAWAL", 0, "CAD"),
+                ]);
+            }
+            let (service, _, _) = make_service_with(rows);
+            let response = service
+                .search(
+                    snapshot_request(CashActivitySelectionMode::All, &["unselected"]),
+                    Some("USD"),
+                    "UTC",
+                )
+                .await
+                .unwrap();
+            let snapshot = response.selection_snapshot.unwrap();
+            let totals: BTreeMap<_, _> = snapshot
+                .net
+                .by_currency
+                .iter()
+                .map(|entry| (entry.currency.as_str(), entry.amount))
+                .collect();
+            let expected = if mixed {
+                BTreeMap::from([("CAD", 0.0), ("EUR", 0.0), ("GBP", 0.0)])
+            } else {
+                BTreeMap::from([("EUR", 0.0)])
+            };
+            assert_eq!(totals, expected);
+            assert_eq!(snapshot.net.converted, None);
+            assert_eq!(
+                snapshot.ids.len(),
+                response.analysis.unwrap().selected.count
+            );
+            assert_eq!(
+                response.net.unwrap().by_currency,
+                vec![CurrencyNet {
+                    currency: "JPY".into(),
+                    amount: -30.0,
+                }]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_restores_zero_eur_pair_entirely_beyond_loaded_page() {
+        let mut rows: Vec<_> = (0..50)
+            .map(|i| cash_row(&format!("row-{i:03}"), "WITHDRAWAL", 1, "USD"))
+            .collect();
+        rows.extend([
+            cash_row("row-050-eur-in", "DEPOSIT", 10, "EUR"),
+            cash_row("row-051-eur-out", "WITHDRAWAL", 10, "EUR"),
+        ]);
+        for row in &mut rows {
+            row.activity_date = "2026-01-01T12:00:00Z".parse().unwrap();
+        }
+        let expected_ids: Vec<_> = rows.iter().map(|row| row.id.clone()).collect();
+        let (service, _, _) = make_service_with_fx(rows, MockFx::with(&[("EUR", 2, 0)]));
+        let mut request = snapshot_request(CashActivitySelectionMode::All, &[]);
+        request.limit = 50;
+        let response = service
+            .search(request.clone(), Some("USD"), "UTC")
+            .await
+            .unwrap();
+
+        assert_eq!(response.items.len(), 50);
+        assert!(response.items.iter().all(|row| row.activity.currency == "USD"));
+        let usd_total = CurrencyNet {
+            currency: "USD".into(),
+            amount: -50.0,
+        };
+        assert_eq!(response.net.unwrap().by_currency, vec![usd_total.clone()]);
+        let snapshot = response.selection_snapshot.unwrap();
+        assert_eq!(snapshot.ids, expected_ids);
+        assert_eq!(snapshot.ids.len(), response.analysis.unwrap().selected.count);
+        assert_eq!(
+            snapshot.net.by_currency,
+            vec![
+                usd_total,
+                CurrencyNet {
+                    currency: "EUR".into(),
+                    amount: 0.0,
+                },
+            ]
+        );
+        assert_eq!(snapshot.net.converted, None);
+        assert_eq!(
+            snapshot.cash_flow_buckets,
+            [CashFlowBucket::Spending, CashFlowBucket::Income]
+        );
+
+        for mode in [CashActivitySelectionMode::All, CashActivitySelectionMode::Explicit] {
+            request.selection = Some(CashActivitySelection {
+                mode,
+                ids: if mode == CashActivitySelectionMode::Explicit {
+                    expected_ids.clone()
+                } else {
+                    Vec::new()
+                },
+            });
+            for (offset, limit) in [(0, 0), (50, 50), (10, 1), (52, 0)] {
+                request.offset = offset;
+                request.limit = limit;
+                let response = service
+                    .search(request.clone(), Some("USD"), "UTC")
+                    .await
+                    .unwrap();
+                assert_eq!(response.selection_snapshot.as_ref(), Some(&snapshot));
+                assert_eq!(snapshot.ids.len(), response.analysis.unwrap().selected.count);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_keeps_zero_currency_fx_residual_out_of_legacy_conversion() {
+        let mut incoming = cash_row("cad-in", "DEPOSIT", 10, "CAD");
+        incoming.fx_rate = Some(Decimal::new(3, 0));
+        let mut outgoing = cash_row("cad-out", "WITHDRAWAL", 10, "CAD");
+        outgoing.fx_rate = Some(Decimal::new(2, 0));
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                incoming,
+                outgoing,
+                cash_row("usd", "WITHDRAWAL", 60, "USD"),
+                cash_row("eur", "WITHDRAWAL", 40, "EUR"),
+            ],
+            MockFx::with(&[("EUR", 2, 0)]),
+        );
+        let response = service
+            .search(
+                snapshot_request(CashActivitySelectionMode::All, &[]),
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+        let canonical = response.net.unwrap();
+        let snapshot = response.selection_snapshot.unwrap();
+        assert_eq!(
+            canonical.converted,
+            Some(CurrencyNet {
+                currency: "USD".into(),
+                amount: -140.0
+            })
+        );
+        assert_eq!(snapshot.net.converted, canonical.converted);
+        assert_eq!(
+            snapshot.net.by_currency.len(),
+            canonical.by_currency.len() + 1
+        );
+        assert_eq!(
+            snapshot.net.by_currency.last().unwrap(),
+            &CurrencyNet {
+                currency: "CAD".into(),
+                amount: 0.0
+            }
+        );
+        assert_eq!(
+            response
+                .analysis
+                .unwrap()
+                .selected
+                .cash_movement
+                .converted
+                .unwrap()
+                .amount,
+            "-130"
+        );
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_preserves_legacy_missing_rate_and_single_currency_policies()
+    {
+        for jpy_out in [10, 11] {
+            let (service, _, _) = make_service_with_fx(
+                vec![
+                    cash_row("jpy-in", "DEPOSIT", 10, "JPY"),
+                    cash_row("jpy-out", "WITHDRAWAL", jpy_out, "JPY"),
+                    cash_row("usd", "WITHDRAWAL", 60, "USD"),
+                    cash_row("eur", "WITHDRAWAL", 40, "EUR"),
+                ],
+                MockFx::with(&[("EUR", 2, 0)]),
+            );
+            let response = service
+                .search(
+                    snapshot_request(CashActivitySelectionMode::All, &[]),
+                    Some("USD"),
+                    "UTC",
+                )
+                .await
+                .unwrap();
+            let snapshot = response.selection_snapshot.unwrap();
+            assert_eq!(snapshot.net.converted, response.net.unwrap().converted);
+            if jpy_out == 10 {
+                assert_eq!(snapshot.net.converted.unwrap().amount, -140.0);
+                assert!(snapshot
+                    .net
+                    .by_currency
+                    .iter()
+                    .any(|entry| entry.currency == "JPY" && entry.amount == 0.0));
+            } else {
+                assert_eq!(snapshot.net.converted, None);
+            }
+            let response = service
+                .search(
+                    snapshot_request(CashActivitySelectionMode::Explicit, &["eur"]),
+                    Some("USD"),
+                    "UTC",
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.selection_snapshot.unwrap().net.converted, None);
+            assert_eq!(
+                response
+                    .analysis
+                    .unwrap()
+                    .selected
+                    .cash_movement
+                    .converted
+                    .unwrap()
+                    .amount,
+                "-80"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_uses_full_transfer_context_and_actual_unloaded_buckets() {
+        let mut internal_out = cash_row("internal-out", "TRANSFER_OUT", 100, "USD");
+        internal_out.source_group_id = Some("internal".into());
+        let mut internal_in = cash_row("internal-in", "TRANSFER_IN", 100, "USD");
+        internal_in.source_group_id = Some("internal".into());
+        internal_in.activity_date = "2025-01-01T12:00:00Z".parse().unwrap();
+        let mut saving = cash_row("saving", "TRANSFER_OUT", 75, "USD");
+        saving.source_group_id = Some("to-investments".into());
+        let mut investing_leg = cash_row("investing-leg", "TRANSFER_IN", 75, "USD");
+        investing_leg.source_group_id = Some("to-investments".into());
+        investing_leg.account_id = "not-opted-in-investments".into();
+        let mut expense = cash_row("effective-expense", "DEPOSIT", 5, "USD");
+        expense.activity_type_override = Some("WITHDRAWAL".into());
+        let (service, _, _) = make_service_with(vec![
+            internal_out,
+            internal_in,
+            saving,
+            investing_leg,
+            expense,
+            cash_row("income", "DEPOSIT", 10, "USD"),
+            cash_row("expense", "WITHDRAWAL", 3, "USD"),
+        ]);
+        let mut request = snapshot_request(CashActivitySelectionMode::All, &[]);
+        request.start_date = Some("2026-01-01T00:00:00Z".into());
+        request.limit = 0;
+        let response = service
+            .search(request.clone(), Some("USD"), "UTC")
+            .await
+            .unwrap();
+        assert!(response.items.is_empty());
+        let snapshot = response.selection_snapshot.unwrap();
+        assert_eq!(snapshot.ids.len(), 5);
+        assert_eq!(snapshot.cash_flow_buckets.len(), 4);
+        for bucket in [
+            CashFlowBucket::Spending,
+            CashFlowBucket::Income,
+            CashFlowBucket::Saving,
+            CashFlowBucket::Neutral,
+        ] {
+            assert!(snapshot.cash_flow_buckets.contains(&bucket));
+        }
+        request.selection = Some(CashActivitySelection {
+            mode: CashActivitySelectionMode::Explicit,
+            ids: vec![
+                "internal-out".into(),
+                "internal-in".into(),
+                "investing-leg".into(),
+            ],
+        });
+        request.activity_types = Some(vec!["TRANSFER_OUT".into()]);
+        let response = service.search(request, Some("USD"), "UTC").await.unwrap();
+        let snapshot = response.selection_snapshot.unwrap();
+        assert_eq!(snapshot.ids, ["internal-out"]);
+        assert_eq!(snapshot.cash_flow_buckets, [CashFlowBucket::Neutral]);
+    }
+
+    #[tokio::test]
+    async fn search_selection_snapshot_empty_and_disabled_paths_are_explicitly_empty() {
+        for scenario in 0..5 {
+            let (mut service, _, _) =
+                make_service_with(vec![cash_row("row", "WITHDRAWAL", 5, "EUR")]);
+            let mut request = snapshot_request(CashActivitySelectionMode::All, &[]);
+            match scenario {
+                0 => request.search = Some("no match".into()),
+                1 => {
+                    service.settings =
+                        Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo {
+                            disabled: true,
+                            ..Default::default()
+                        })))
+                }
+                2 => {
+                    service.settings =
+                        Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo {
+                            account_ids: Some(vec![]),
+                            ..Default::default()
+                        })))
+                }
+                3 => request.account_ids = Some(vec!["outside".into()]),
+                _ => {
+                    service.settings =
+                        Arc::new(SpendingSettingsService::new(Arc::new(MockSettingsRepo {
+                            account_ids: Some(vec!["missing-account".into()]),
+                            ..Default::default()
+                        })))
+                }
+            }
+            for base in [Some("USD"), None] {
+                let response = service.search(request.clone(), base, "UTC").await.unwrap();
+                assert_eq!(
+                    response.selection_snapshot,
+                    Some(CashActivitySelectionSnapshot::default())
+                );
+                assert_eq!(response.analysis.unwrap().selected.count, 0);
+            }
+            request.selection = None;
+            let error = service
+                .search(request, Some("USD"), "UTC")
+                .await
+                .unwrap_err();
+            assert!(matches!(
+                error.downcast_ref::<SpendingError>(),
+                Some(SpendingError::InvalidInput { .. })
+            ));
+            assert!(error
+                .to_string()
+                .contains("includeSelectionSnapshot requires selection"));
+        }
+    }
+
+    #[test]
+    fn search_selection_snapshot_wire_contract_requires_selection_and_defaults_off() {
+        let old: CashActivitySearchRequest = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!old.include_selection_snapshot);
+        assert!(old.validate_selection_snapshot().is_ok());
+        let invalid: CashActivitySearchRequest = serde_json::from_value(serde_json::json!({
+            "includeSelectionSnapshot": true
+        }))
+        .unwrap();
+        assert!(invalid.validate_selection_snapshot().is_err());
+        let valid: CashActivitySearchRequest = serde_json::from_value(serde_json::json!({
+            "includeSelectionSnapshot": true, "selection": { "mode": "all", "ids": [] }
+        }))
+        .unwrap();
+        assert!(valid.validate_selection_snapshot().is_ok());
+        let old_response: CashActivitySearchResponse = serde_json::from_value(serde_json::json!({
+            "items": [], "totalCount": 0
+        }))
+        .unwrap();
+        assert!(old_response.selection_snapshot.is_none());
+        assert!(serde_json::to_value(old_response)
+            .unwrap()
+            .get("selectionSnapshot")
+            .is_none());
+        assert_eq!(
+            serde_json::to_value(CashActivitySelectionSnapshot::default()).unwrap(),
+            serde_json::json!({
+                "ids": [], "net": { "byCurrency": [], "converted": null }, "cashFlowBuckets": []
+            })
+        );
     }
 
     #[test]

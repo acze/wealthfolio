@@ -142,6 +142,9 @@
     "amountChipBetween": "Amount between {{value}} and {{value2}}"
   },
   "transactions": {
+    "preparingSelection": "Preparing selected transactions...",
+    "selectionLoadFailed": "Could not prepare selected transactions. Your selection is preserved.",
+    "includesOtherPages": "Includes selected transactions on other pages.",
     "deleteTitle_one": "Delete transaction",
     "deleteTitle_other": "Delete transactions",
     "deleteConfirmSingle": "Are you sure you want to delete this {{type}} of {{amount}}?",

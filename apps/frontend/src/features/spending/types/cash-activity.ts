@@ -65,6 +65,8 @@ export interface CashActivitySearchRequest {
   limit?: number;
   /** Read-only analysis. In all mode, ids are exclusions; otherwise inclusions. */
   selection?: CashActivitySelection;
+  /** Resolve a whole-result selection to explicit IDs before offering bulk actions. */
+  includeSelectionSnapshot?: boolean;
 }
 
 export interface CashActivitySelection {
@@ -139,6 +141,12 @@ export interface NetSummary {
   converted?: CurrencyNet | null;
 }
 
+export interface CashActivitySelectionSnapshot {
+  ids: string[];
+  net: NetSummary;
+  cashFlowBuckets: CashFlowBucket[];
+}
+
 export interface CashActivitySearchResponse {
   items: CashActivity[];
   totalCount: number;
@@ -154,4 +162,5 @@ export interface CashActivitySearchResponse {
    */
   baseCurrency?: string | null;
   analysis?: CashActivityAnalysis | null;
+  selectionSnapshot?: CashActivitySelectionSnapshot | null;
 }
