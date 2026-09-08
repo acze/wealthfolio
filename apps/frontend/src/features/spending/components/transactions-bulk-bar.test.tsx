@@ -61,4 +61,18 @@ describe("TransactionsBulkBar selection preparation", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(p.onDelete).toHaveBeenCalledOnce();
   });
+
+  it.each([1000, 1001])("respects the atomic categorization boundary at %s rows", (count) => {
+    render(<TransactionsBulkBar {...props()} selectedCount={count} categoryScope="expense" />);
+    const categorize = screen.getByRole("button", { name: "Categorize" });
+    if (count === 1000) {
+      expect(categorize).toBeEnabled();
+    } else {
+      expect(categorize).toBeDisabled();
+      expect(screen.getByText(/Categorize up to 1000 transactions at once/)).toBeVisible();
+    }
+    expect(screen.getByText(`${count} selected`)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Tag event" })).toBeEnabled();
+  });
 });

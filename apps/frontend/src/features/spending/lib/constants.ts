@@ -1,5 +1,8 @@
 import { AccountPurpose, accountSupportsPurpose, isLiabilityAccountType } from "@/lib/constants";
 
+/** Matches the existing atomic category-assignment limit in HTTP and Tauri. */
+export const MAX_BULK_CATEGORY_ASSIGNMENTS = 1_000;
+
 /** Cash/card activity types tracked by the spending module. */
 export const CASH_ACTIVITY_TYPES = [
   "DEPOSIT",

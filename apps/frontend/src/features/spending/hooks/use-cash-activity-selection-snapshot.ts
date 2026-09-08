@@ -1,9 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { QueryKeys } from "@/lib/query-keys";
 
 import { searchCashActivities } from "../adapters/cash-activities";
-import type { CashActivitySearchRequest, CashActivitySelection } from "../types/cash-activity";
+import type {
+  CashActivitySearchRequest,
+  CashActivitySelection,
+  CashActivitySelectionSnapshot,
+} from "../types/cash-activity";
 
 export function useCashActivitySelectionSnapshot(
   request: Omit<
@@ -13,8 +17,10 @@ export function useCashActivitySelectionSnapshot(
   selection: CashActivitySelection,
   enabled: boolean,
 ) {
+  const queryClient = useQueryClient();
+  const queryKey = [QueryKeys.SPENDING_TRANSACTIONS, "selection-snapshot", request, selection];
   const query = useQuery({
-    queryKey: [QueryKeys.SPENDING_TRANSACTIONS, "selection-snapshot", request, selection],
+    queryKey,
     queryFn: async () => {
       const response = await searchCashActivities({
         ...request,
@@ -30,8 +36,21 @@ export function useCashActivitySelectionSnapshot(
     retry: false,
     staleTime: 0,
   });
+  // Confirmation handlers must see invalidation even before React has rerendered.
+  const getReadySnapshot = () => {
+    const current = queryClient.getQueryState<CashActivitySelectionSnapshot>(queryKey);
+    return enabled &&
+      current?.status === "success" &&
+      current.fetchStatus === "idle" &&
+      !current.isInvalidated
+      ? current.data
+      : undefined;
+  };
+  const snapshot =
+    enabled && query.isSuccess && query.fetchStatus === "idle" ? query.data : undefined;
   return {
-    snapshot: enabled && query.isSuccess && query.fetchStatus === "idle" ? query.data : undefined,
+    snapshot: snapshot && getReadySnapshot() === snapshot ? snapshot : undefined,
+    getReadySnapshot,
     isPending: query.isPending,
     isFetching: query.isFetching,
     isPaused: query.isPaused,

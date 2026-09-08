@@ -4,6 +4,12 @@ import type { CashActivitySelection } from "../types/cash-activity";
 
 export const EMPTY_ANALYSIS_SELECTION: CashActivitySelection = { mode: "explicit", ids: [] };
 
+export interface AnalysisSelectionContext {
+  readonly scope: string;
+  readonly active: boolean;
+  readonly selection: CashActivitySelection;
+}
+
 export function isAnalysisSelected(selection: CashActivitySelection, id: string): boolean {
   return selection.mode === "all" ? !selection.ids.includes(id) : selection.ids.includes(id);
 }
@@ -23,7 +29,7 @@ export function toggleAnalysisRows(
 
 /** Modes share the logical selection; mutations require a server-resolved ID snapshot. */
 export function useAnalysisSelection(scope: string, initiallyActive = false) {
-  const [state, setState] = useState(() => ({
+  const [state, setState] = useState<AnalysisSelectionContext>(() => ({
     scope,
     active: initiallyActive,
     selection: EMPTY_ANALYSIS_SELECTION,
@@ -33,11 +39,16 @@ export function useAnalysisSelection(scope: string, initiallyActive = false) {
   }
   const selection = state.scope === scope ? state.selection : EMPTY_ANALYSIS_SELECTION;
   return {
+    context: state,
     active: state.active,
     selection,
     start: () => setState((prev) => ({ ...prev, active: true })),
     stop: () => setState((prev) => ({ ...prev, active: false })),
     clear: () => setState((prev) => ({ ...prev, selection: EMPTY_ANALYSIS_SELECTION })),
+    clearIfUnchanged: (submitted: AnalysisSelectionContext) =>
+      setState((prev) =>
+        prev === submitted ? { ...prev, selection: EMPTY_ANALYSIS_SELECTION } : prev,
+      ),
     selectAll: () => setState((prev) => ({ ...prev, selection: { mode: "all", ids: [] } })),
     toggle: (ids: string[]) =>
       setState((prev) => ({
