@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "Seleccionar una opción",
+    "title": "Seleccionar una opción"
+  },
+  "progress": {
+    "title": "Procesando",
+    "description": "Espera mientras procesamos tu solicitud. Esto puede tardar unos instantes.",
+    "message": "Procesando..."
+  },
+  "budget": {
+    "overBudget": "{{percent}} % por encima del presupuesto",
+    "onTrack": "Según lo previsto",
+    "used": "{{percent}} % utilizado"
+  },
   "carousel": {
+    "view": "Vista {{number}}",
+    "goTo": "Ir a {{name}}",
+    "goToView": "Ir a la vista {{number}}",
     "previous": "Diapositiva anterior",
     "next": "Diapositiva siguiente"
   },
   "currency": {
+    "placeholder": "Seleccionar la divisa de la cuenta",
+    "popular": "Populares",
     "selectTitle": "Seleccionar moneda",
     "selectDescription": "Elige la moneda de tu actividad",
     "more": "Más",
@@ -15,6 +34,10 @@
     "noneFoundShort": "No se encontró ninguna moneda."
   },
   "dataGrid": {
+    "copyFailed": "No se pudo copiar al portapapeles",
+    "cutFailed": "No se pudo cortar al portapapeles",
+    "pasteFailed": "No se pudo pegar. Inténtalo de nuevo.",
+    "pasteSkipped": "Celdas omitidas por datos no válidos: {{count}}",
     "label": "Cuadrícula de datos",
     "addRow": "Agregar fila",
     "sortAsc": "Orden ascendente",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "Confirmar",
+    "delete": "Eliminar",
+    "pending": "En curso...",
     "close": "Cerrar",
     "cancel": "Cancelar",
     "continue": "Continuar",

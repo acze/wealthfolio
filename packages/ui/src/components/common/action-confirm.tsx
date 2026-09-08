@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button, type ButtonProps } from "../ui/button";
 import { Icons } from "../ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -24,12 +25,13 @@ export const ActionConfirm = ({
   handleConfirm,
   button,
   isPending,
-  confirmButtonText = "Confirm",
+  confirmButtonText,
   confirmButtonVariant = "destructive",
-  cancelButtonText = "Cancel",
-  pendingText = "In progress...",
+  cancelButtonText,
+  pendingText,
   side,
 }: ActionConfirmProps) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const wasConfirming = useRef(false);
 
@@ -49,6 +51,7 @@ export const ActionConfirm = ({
             variant="ghost"
             size="sm"
             className="h-7 w-7 p-0"
+            aria-label={confirmTitle}
             onClick={(e) => {
               e.stopPropagation();
             }}
@@ -72,16 +75,16 @@ export const ActionConfirm = ({
                 handleCancel?.();
               }}
             >
-              {cancelButtonText}
+              {cancelButtonText ?? t("ui:dialog.cancel", "Cancel")}
             </Button>
             <Button variant={confirmButtonVariant} size="sm" disabled={isPending} onClick={handleConfirm}>
               {isPending ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  {pendingText}
+                  {pendingText ?? t("ui:dialog.pending", "In progress...")}
                 </>
               ) : (
-                confirmButtonText
+                (confirmButtonText ?? t("ui:dialog.confirm", "Confirm"))
               )}
             </Button>
           </div>

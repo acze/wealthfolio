@@ -3,6 +3,7 @@
 import { cn } from "../../lib/utils";
 import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 type CarouselApi = UseEmblaCarouselType[1];
 const SWIPE_DRAG_BLOCK_SELECTOR = "[data-no-swipe-drag]";
@@ -54,6 +55,7 @@ export function SwipableView({
   initialIndex = 0,
   selectedIndex: controlledIndex,
 }: SwipableViewProps) {
+  const { t } = useTranslation();
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "start",
@@ -143,7 +145,8 @@ export function SwipableView({
                   role="status"
                   aria-live="polite"
                 >
-                  {items[selectedIndex]?.name || `View ${selectedIndex + 1}`}
+                  {items[selectedIndex]?.name ||
+                    t("ui:carousel.view", "View {{number}}", { number: selectedIndex + 1 })}
                 </div>
               ) : (
                 /* Dot Navigation */
@@ -156,7 +159,11 @@ export function SwipableView({
                     "bg-foreground/20 hover:bg-foreground/40",
                     dotClassName,
                   )}
-                  aria-label={`Go to ${items[index]?.name || `view ${index + 1}`}`}
+                  aria-label={
+                    items[index]?.name
+                      ? t("ui:carousel.goTo", "Go to {{name}}", { name: items[index].name })
+                      : t("ui:carousel.goToView", "Go to view {{number}}", { number: index + 1 })
+                  }
                 />
               )}
             </React.Fragment>

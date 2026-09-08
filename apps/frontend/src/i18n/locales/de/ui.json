@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "Option auswählen",
+    "title": "Option auswählen"
+  },
+  "progress": {
+    "title": "Verarbeitung",
+    "description": "Bitte warten Sie, während Ihre Anfrage verarbeitet wird. Dies kann einen Moment dauern.",
+    "message": "Wird verarbeitet..."
+  },
+  "budget": {
+    "overBudget": "{{percent}} % über dem Budget",
+    "onTrack": "Im Plan",
+    "used": "{{percent}} % verbraucht"
+  },
   "carousel": {
+    "view": "Ansicht {{number}}",
+    "goTo": "Zu {{name}} wechseln",
+    "goToView": "Zu Ansicht {{number}} wechseln",
     "previous": "Vorherige Folie",
     "next": "Nächste Folie"
   },
   "currency": {
+    "placeholder": "Kontowährung auswählen",
+    "popular": "Häufig verwendet",
     "selectTitle": "Währung auswählen",
     "selectDescription": "Wählen Sie die Währung Ihrer Aktivität",
     "more": "Mehr",
@@ -15,6 +34,10 @@
     "noneFoundShort": "Keine Währung gefunden."
   },
   "dataGrid": {
+    "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen",
+    "cutFailed": "Ausschneiden in die Zwischenablage fehlgeschlagen",
+    "pasteFailed": "Einfügen fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "pasteSkipped": "Wegen ungültiger Daten übersprungene Zellen: {{count}}",
     "label": "Datenraster",
     "addRow": "Zeile hinzufügen",
     "sortAsc": "Aufsteigend sortieren",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "Bestätigen",
+    "delete": "Löschen",
+    "pending": "Wird ausgeführt...",
     "close": "Schließen",
     "cancel": "Abbrechen",
     "continue": "Fortfahren",

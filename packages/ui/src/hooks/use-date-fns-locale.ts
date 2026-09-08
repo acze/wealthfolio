@@ -8,6 +8,7 @@ import {
   frCA,
   ja,
   ko,
+  pl,
   pt,
   ptBR,
   zhCN,
@@ -29,6 +30,7 @@ const DATE_FNS_LOCALES: Record<string, Locale> = {
   "zh-CN": zhCN,
   "ja-JP": ja,
   "ko-KR": ko,
+  "pl-PL": pl,
 };
 
 const LANGUAGE_LOCALES: Record<string, Locale> = {
@@ -40,6 +42,7 @@ const LANGUAGE_LOCALES: Record<string, Locale> = {
   zh: zhCN,
   ja,
   ko,
+  pl,
 };
 
 const REGION_LOCALES: Record<string, Locale> = {
@@ -55,6 +58,7 @@ const REGION_LOCALES: Record<string, Locale> = {
   CN: zhCN,
   JP: ja,
   KR: ko,
+  PL: pl,
 };
 
 const generatedLocales = new Map<string, Locale>();

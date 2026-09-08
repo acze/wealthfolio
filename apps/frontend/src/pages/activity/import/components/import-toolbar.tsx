@@ -11,6 +11,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Icons,
+  getLocalizedCurrencyOptions,
   quoteCurrencies,
   quoteUnitCurrencies,
   worldCurrencies,
@@ -47,7 +48,7 @@ export function ImportToolbar({
   onSetAccount,
   onClearSelection,
 }: ImportToolbarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { accounts } = useAccounts({ filterActive: true, includeArchived: false });
   const [currencySearch, setCurrencySearch] = useState("");
 
@@ -57,13 +58,17 @@ export function ImportToolbar({
   }, []);
 
   // Filter currencies based on search
+  const currencyOptions = getLocalizedCurrencyOptions(
+    currencySearch ? quoteCurrencies : worldCurrencies,
+    i18n.resolvedLanguage || i18n.language,
+  );
   const filteredCurrencies = currencySearch
-    ? quoteCurrencies.filter(
+    ? currencyOptions.filter(
         (c) =>
           c.value.toLowerCase().includes(currencySearch.toLowerCase()) ||
           c.label.toLowerCase().includes(currencySearch.toLowerCase()),
       )
-    : worldCurrencies;
+    : currencyOptions;
 
   if (selectedCount === 0) {
     return null;

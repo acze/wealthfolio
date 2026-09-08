@@ -1,7 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Calendar, DatePickerInput, FormattingProvider, MonthYearPicker } from "@wealthfolio/ui";
+import {
+  Calendar,
+  DatePickerInput,
+  FormattingProvider,
+  IntervalSelector,
+  MonthYearPicker,
+} from "@wealthfolio/ui";
+import i18next from "i18next";
+import { I18nextProvider } from "react-i18next";
 import { describe, expect, it, vi } from "vitest";
+import plUi from "@/i18n/locales/pl/ui.json";
 import { MonthSwitcher } from "../features/spending/components/month-switcher";
 
 describe("calendar localization policy", () => {
@@ -74,6 +83,53 @@ describe("calendar localization policy", () => {
 
     expect(screen.getByRole("button", { name: "Previous month" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Next month" })).toBeInTheDocument();
+  });
+
+  it("uses Polish control labels without overriding an English formatting region", async () => {
+    const i18n = i18next.createInstance();
+    await i18n.init({ lng: "pl", fallbackLng: false, resources: { pl: { ui: plUi } } });
+    render(
+      <I18nextProvider i18n={i18n}>
+        <FormattingProvider locale="en-US" uiLocale="pl">
+          <Calendar defaultMonth={new Date(2026, 7, 1)} />
+        </FormattingProvider>
+      </I18nextProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Poprzedni miesiąc" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Następny miesiąc" })).toBeInTheDocument();
+    expect(screen.getByText("August 2026")).toBeInTheDocument();
+  });
+
+  it("changes Polish month-picker labels but preserves the ISO value", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <FormattingProvider locale="PL" uiLocale="pl">
+        <MonthYearPicker value="2026-01" maxDate="2026-12" onChange={onChange} />
+      </FormattingProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "lipiec" }));
+    expect(onChange).toHaveBeenCalledWith("2026-07");
+  });
+
+  it("localizes short period labels without changing period identifiers", async () => {
+    const user = userEvent.setup();
+    const onIntervalSelect = vi.fn();
+    const i18n = i18next.createInstance();
+    await i18n.init({ lng: "pl", fallbackLng: false, resources: { pl: { ui: plUi } } });
+    render(
+      <I18nextProvider i18n={i18n}>
+        <IntervalSelector onIntervalSelect={onIntervalSelect} />
+      </I18nextProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "1T" }));
+    expect(onIntervalSelect).toHaveBeenCalledWith("1W", expect.any(String), {
+      from: expect.any(Date),
+      to: expect.any(Date),
+    });
   });
 
   it("uses UI-language labels for React Aria calendar controls", async () => {

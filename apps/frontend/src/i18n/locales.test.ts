@@ -51,6 +51,8 @@ describe("supported locales", () => {
       expect(normalizeLocaleCode("fr-CA")).toBe("fr");
       expect(normalizeLocaleCode("en_US")).toBe("en");
       expect(normalizeLocaleCode("pt-PT")).toBe("pt");
+      expect(normalizeLocaleCode("pl-PL")).toBe("pl");
+      expect(normalizeLocaleCode("pl_PL")).toBe("pl");
     });
 
     it("does not treat a Traditional region as Chinese on another language", () => {
@@ -62,6 +64,12 @@ describe("supported locales", () => {
       for (const code of SUPPORTED_LOCALE_CODES) {
         expect(normalizeLocaleCode(code)).toBe(code);
       }
+    });
+
+    it("offers Polish by its native name without changing the default", async () => {
+      const { DEFAULT_LOCALE, SUPPORTED_LOCALES } = await import("./locales");
+      expect(DEFAULT_LOCALE).toBe("en");
+      expect(SUPPORTED_LOCALES.find(({ code }) => code === "pl")?.label).toBe("Polski");
     });
   });
 });

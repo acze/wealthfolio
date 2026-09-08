@@ -55,6 +55,20 @@ describe("addon sandbox i18n", () => {
     expect(i18n.language).toBe("fr");
   });
 
+  it("bundles Polish UI and follows regional Polish language updates", async () => {
+    const { initSandboxI18n, setSandboxLanguage } = await loadSandboxI18n();
+    const i18n = initSandboxI18n("pl-PL");
+
+    expect(i18n.language).toBe("pl");
+    expect(i18n.t("ui:sheet.close")).toBe("Zamknij");
+    expect(document.documentElement.lang).toBe("pl");
+
+    setSandboxLanguage("en");
+    expect(i18n.t("ui:sheet.close")).toBe("Close");
+    setSandboxLanguage("pl_PL");
+    expect(i18n.t("ui:sheet.close")).toBe("Zamknij");
+  });
+
   it("defaults to the default locale when the host sends no language", async () => {
     const { initSandboxI18n } = await loadSandboxI18n();
     const { DEFAULT_LOCALE } = await import("@/i18n/locales");

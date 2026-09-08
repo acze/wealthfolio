@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion } from "motion/react";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // Custom DialogContent without close button
 const DialogContentWithoutClose = React.forwardRef<
@@ -38,11 +39,15 @@ export interface ProgressIndicatorProps {
 export function ProgressIndicator({
   isLoading = true,
   open,
-  title = "Processing",
-  description = "Please wait while we process your request. This may take a few moments.",
-  message = "Processing...",
+  title,
+  description,
+  message,
   className,
 }: ProgressIndicatorProps) {
+  const { t } = useTranslation();
+  const resolvedDescription =
+    description ??
+    t("ui:progress.description", "Please wait while we process your request. This may take a few moments.");
   const [elapsedTime, setElapsedTime] = useState(0);
 
   // Track elapsed time during import
@@ -92,16 +97,16 @@ export function ProgressIndicator({
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            {message}
+            {message ?? t("ui:progress.message", "Processing...")}
           </motion.h3>
-          {description && (
+          {resolvedDescription && (
             <motion.p
               className="text-muted-foreground text-sm"
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.2 }}
             >
-              {description}
+              {resolvedDescription}
             </motion.p>
           )}
           <motion.p
@@ -141,8 +146,8 @@ export function ProgressIndicator({
     return (
       <Dialog open={open}>
         <DialogContentWithoutClose className="border-none bg-transparent p-0 shadow-none sm:max-w-md">
-          <DialogTitle className="sr-only">{title}</DialogTitle>
-          <DialogDescription className="sr-only">{description}</DialogDescription>
+          <DialogTitle className="sr-only">{title ?? t("ui:progress.title", "Processing")}</DialogTitle>
+          <DialogDescription className="sr-only">{resolvedDescription}</DialogDescription>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

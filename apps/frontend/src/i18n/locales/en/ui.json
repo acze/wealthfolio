@@ -1,9 +1,28 @@
 {
+  "select": {
+    "placeholder": "Select an option",
+    "title": "Select Option"
+  },
+  "progress": {
+    "title": "Processing",
+    "description": "Please wait while we process your request. This may take a few moments.",
+    "message": "Processing..."
+  },
+  "budget": {
+    "overBudget": "{{percent}}% over budget",
+    "onTrack": "On track",
+    "used": "{{percent}}% used"
+  },
   "carousel": {
+    "view": "View {{number}}",
+    "goTo": "Go to {{name}}",
+    "goToView": "Go to view {{number}}",
     "previous": "Previous slide",
     "next": "Next slide"
   },
   "currency": {
+    "placeholder": "Select account currency",
+    "popular": "Popular",
     "selectTitle": "Select Currency",
     "selectDescription": "Choose your activity currency",
     "more": "More",
@@ -15,6 +34,10 @@
     "noneFoundShort": "No currency found."
   },
   "dataGrid": {
+    "copyFailed": "Failed to copy to clipboard",
+    "cutFailed": "Failed to cut to clipboard",
+    "pasteFailed": "Failed to paste. Please try again.",
+    "pasteSkipped": "Cells skipped due to invalid data: {{count}}",
     "label": "Data grid",
     "addRow": "Add row",
     "sortAsc": "Sort asc",
@@ -131,6 +154,9 @@
     }
   },
   "dialog": {
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "pending": "In progress...",
     "close": "Close",
     "cancel": "Cancel",
     "continue": "Continue",

@@ -1,0 +1,229 @@
+{
+  "section": {
+    "deviceSync": "Synchronizacja urządzeń",
+    "connectedDevices": "Połączone urządzenia",
+    "otherConnectedDevices": "Inne połączone urządzenia",
+    "manageDevices": "Zarządzaj urządzeniami",
+    "options": "Opcje",
+    "deviceActions": "Działania dotyczące urządzenia"
+  },
+  "setup": {
+    "cardDescription": "Bezpiecznie synchronizuj dane na wszystkich swoich urządzeniach.",
+    "connectToSync": "Połącz to urządzenie, aby je synchronizować",
+    "keepInSync": "Synchronizuj swoje urządzenia",
+    "foundOtherDevices": "Na Twoim koncie znaleziono inne połączone urządzenia. Kontynuuj, aby połączyć to urządzenie.",
+    "encryptedInfo": "Twoje dane są szyfrowane end-to-end. Tylko Twoje urządzenia mogą je odczytać.",
+    "morePreview": "+{{count}} więcej",
+    "settingUp": "Konfigurowanie...",
+    "connectThisDevice": "Połącz to urządzenie",
+    "enableDeviceSync": "Włącz synchronizację urządzeń",
+    "morePreview_one": "+{{count}} więcej",
+    "morePreview_few": "+{{count}} więcej",
+    "morePreview_many": "+{{count}} więcej",
+    "morePreview_other": "+{{count}} więcej"
+  },
+  "status": {
+    "syncError": "Błąd synchronizacji",
+    "syncPaused": "Synchronizacja wstrzymana",
+    "synced": "Zsynchronizowano",
+    "syncing": "Synchronizowanie",
+    "connected": "Połączono",
+    "needsSetup": "Wymaga konfiguracji",
+    "revoked": "Dostęp cofnięty",
+    "notConnected": "Nie połączono",
+    "online": "Online",
+    "never": "Nigdy",
+    "minutesAgo": "{{count}} min temu",
+    "hoursAgo": "{{count}} godz. temu",
+    "daysAgo": "{{count}} dni temu",
+    "thisDevice": "To urządzenie",
+    "thisDeviceSuffix": "· To urządzenie",
+    "minutesAgo_one": "{{count}} min temu",
+    "minutesAgo_few": "{{count}} min temu",
+    "minutesAgo_many": "{{count}} min temu",
+    "minutesAgo_other": "{{count}} min temu",
+    "hoursAgo_one": "{{count}} godz. temu",
+    "hoursAgo_few": "{{count}} godz. temu",
+    "hoursAgo_many": "{{count}} godz. temu",
+    "hoursAgo_other": "{{count}} godz. temu",
+    "daysAgo_one": "{{count}} dzień temu",
+    "daysAgo_few": "{{count}} dni temu",
+    "daysAgo_many": "{{count}} dni temu",
+    "daysAgo_other": "{{count}} dnia temu"
+  },
+  "engine": {
+    "pauseSync": "Wstrzymaj synchronizację",
+    "resumeSync": "Wznów synchronizację",
+    "updating": "Aktualizowanie...",
+    "backgroundPaused": "Synchronizacja w tle wstrzymana",
+    "backgroundResumed": "Synchronizacja w tle wznowiona",
+    "updateFailed": "Nie udało się zaktualizować synchronizacji w tle"
+  },
+  "errorState": {
+    "failedToInitialize": "Nie udało się zainicjować synchronizacji urządzeń.",
+    "initializationFailed": "Inicjalizacja nie powiodła się",
+    "failedToLoadDevices": "Nie udało się wczytać urządzeń",
+    "tryRefreshing": "Spróbuj odświeżyć."
+  },
+  "stale": {
+    "keysNeedUpdating": "Klucze wymagają aktualizacji",
+    "keysNeedUpdatingDescription": "Ustawienia zabezpieczeń zmieniły się na innym urządzeniu. Połącz to urządzenie ponownie, aby kontynuować synchronizację.",
+    "updateThisDevice": "Zaktualizuj to urządzenie"
+  },
+  "orphaned": {
+    "restoreTitle": "Użyj tego urządzenia, aby przywrócić synchronizację",
+    "restoreDescription": "Żadne inne połączone urządzenie nie jest dostępne. Uruchomimy synchronizację ponownie, korzystając z danych zapisanych na tym urządzeniu.",
+    "confirmDescription": "Uruchomimy synchronizację ponownie, korzystając z danych zapisanych na tym urządzeniu.",
+    "restarting": "Ponowne uruchamianie..."
+  },
+  "untrusted": {
+    "notConnectedYet": "To urządzenie nie jest jeszcze połączone",
+    "enterCodeFromDevices_one": "Wprowadź kod z {{count}} innego połączonego urządzenia.",
+    "enterCodeFromDevices_few": "Wprowadź kod z jednego z {{count}} innych połączonych urządzeń.",
+    "enterCodeFromDevices_many": "Wprowadź kod z jednego z {{count}} innych połączonych urządzeń.",
+    "enterCodeFromDevices_other": "Wprowadź kod z innego połączonego urządzenia. Liczba innych połączonych urządzeń: {{count}}.",
+    "enterCodeGeneric": "Wprowadź kod z innego połączonego urządzenia, aby zsynchronizować dane.",
+    "connectThisDevice": "Połącz to urządzenie",
+    "connectToStartSyncing": "Połącz to urządzenie, aby rozpocząć synchronizację."
+  },
+  "connect": {
+    "connectAnotherDevice": "Połącz inne urządzenie",
+    "connectThisDevice": "Połącz to urządzenie",
+    "pair": "Sparuj",
+    "unpair": "Rozparuj",
+    "revoke": "Cofnij dostęp",
+    "rename": "Zmień nazwę",
+    "disconnect": "Rozłącz"
+  },
+  "waitingSnapshot": {
+    "otherDeviceFinishing": "Twoje inne urządzenie wciąż kończy konfigurację.",
+    "setupAlmostDone": "Konfiguracja jest prawie ukończona.",
+    "trustedHint": "Możesz teraz przyspieszyć ten proces lub poczekać, a będziemy go automatycznie kontynuować w tle.",
+    "untrustedHint": "Najpierw dokończ konfigurację na innym połączonym urządzeniu. Ta strona zaktualizuje się automatycznie.",
+    "checking": "Sprawdzanie...",
+    "checkAgain": "Sprawdź ponownie",
+    "preparing": "Przygotowywanie...",
+    "speedUpSetup": "Przyspiesz konfigurację"
+  },
+  "bootstrap": {
+    "inProgress": "Trwa inicjalizacja synchronizacji...",
+    "hasDataTitle": "To urządzenie zawiera już dane",
+    "hasDataDescription": "Aby ukończyć synchronizację, dane na tym urządzeniu zostaną zastąpione danymi z innego urządzenia.",
+    "continue": "Kontynuuj",
+    "waitingOtherDeviceTitle": "Oczekiwanie na inne urządzenie",
+    "waitingOtherDeviceDescription": "Ukończymy synchronizację, gdy tylko będzie dostępna aktualna migawka.",
+    "retryStartedTitle": "Rozpoczęto ponowną próbę synchronizacji",
+    "retryStartedDescription": "Sprawdzanie dostępności aktualnej migawki i stosowanie oczekujących zmian synchronizacji.",
+    "couldNotRetryTitle": "Nie udało się ponowić synchronizacji",
+    "unableToContinueTitle": "Nie można kontynuować synchronizacji"
+  },
+  "snapshot": {
+    "uploadedTitle": "Migawka przesłana",
+    "uploadedDescription": "Nowo połączone urządzenia mogą teraz dokończyć synchronizację na podstawie tej migawki.",
+    "skippedTitle": "Pominięto przesyłanie migawki",
+    "cancelledTitle": "Anulowano przesyłanie migawki",
+    "resultTitle": "Wynik przesyłania migawki",
+    "failedTitle": "Przesyłanie migawki nie powiodło się"
+  },
+  "backup": {
+    "savedTitle": "Kopia zapasowa zapisana",
+    "savedDescription": "Kopia zapasowa została zapisana jako {{location}}.",
+    "failedTitle": "Tworzenie kopii zapasowej nie powiodło się",
+    "backingUp": "Tworzenie kopii zapasowej...",
+    "backUpFirst": "Najpierw utwórz kopię zapasową"
+  },
+  "overwrite": {
+    "replaceDataTitle": "Zastąpić dane na tym urządzeniu?",
+    "replaceDataDescription": "Twoje lokalne dane zostaną zastąpione danymi z innego połączonego urządzenia.",
+    "localRowsReplaced_one": "{{count}} lokalny wiersz zostanie zastąpiony.",
+    "localRowsReplaced_few": "{{count}} lokalne wiersze zostaną zastąpione.",
+    "localRowsReplaced_many": "{{count}} lokalnych wierszy zostanie zastąpionych.",
+    "localRowsReplaced_other": "{{count}} lokalnego wiersza zostanie zastąpione.",
+    "notNow": "Nie teraz",
+    "syncing": "Synchronizowanie...",
+    "replaceAndSync": "Zastąp i zsynchronizuj"
+  },
+  "reinit": {
+    "title": "Ponownie skonfigurować synchronizację z tego urządzenia?",
+    "description": "Zachowamy dane na tym urządzeniu i użyjemy ich do ponownego uruchomienia synchronizacji. Inne połączone urządzenia mogą wymagać ponownego połączenia.",
+    "notNow": "Nie teraz",
+    "continue": "Kontynuuj"
+  },
+  "recovery": {
+    "title": "Skonfiguruj to urządzenie ponownie",
+    "description": "Synchronizacja została wyłączona dla tego urządzenia. Skonfiguruj je ponownie, aby dane na Twoich urządzeniach były aktualne.",
+    "notNow": "Nie teraz",
+    "settingUp": "Konfigurowanie...",
+    "setUpAgain": "Skonfiguruj to urządzenie ponownie"
+  },
+  "disconnectDialog": {
+    "title": "Rozłączyć to urządzenie?",
+    "description": "Spowoduje to usunięcie synchronizacji z tego urządzenia. Możesz ją później skonfigurować ponownie.",
+    "disconnecting": "Rozłączanie...",
+    "disconnect": "Rozłącz"
+  },
+  "unpairDialog": {
+    "titleLast": "Rozparować ostatnie urządzenie?",
+    "title": "Rozparować urządzenie?",
+    "descriptionLast": "To Twoje jedyne połączone urządzenie. Aby kontynuować synchronizację danych, konieczne będzie ponowne połączenie urządzenia.",
+    "description": "Spowoduje to usunięcie urządzenia \"{{name}}\" z Twojego konta. Aby synchronizować dane, urządzenie trzeba będzie połączyć ponownie.",
+    "unpairing": "Rozparowywanie...",
+    "unpair": "Rozparuj"
+  },
+  "toasts": {
+    "reinitFailed": "Nie udało się ponownie zainicjować synchronizacji",
+    "disconnectFailed": "Nie udało się rozłączyć",
+    "unpairFailed": "Nie udało się rozparować urządzenia"
+  },
+  "pairing": {
+    "connectThisDeviceTitle": "Połącz to urządzenie",
+    "enterCodeDescription": "Wprowadź kod z innego połączonego urządzenia",
+    "connectAnotherTitle": "Połącz inne urządzenie",
+    "scanOrEnterDescription": "Zeskanuj lub wprowadź ten kod na innym urządzeniu",
+    "gettingReadyTitle": "Przygotowywanie tego urządzenia...",
+    "gettingReadyDescription": "To zajmie tylko chwilę.",
+    "prepareFailed": "Nie udało się ukończyć przygotowywania tego urządzenia.",
+    "tryAgain": "Spróbuj ponownie",
+    "starting": "Uruchamianie...",
+    "generatingCode": "Generowanie kodu...",
+    "computingSecurityCode": "Obliczanie kodu bezpieczeństwa...",
+    "finishingSetup": "Kończenie konfiguracji...",
+    "finishingSetupDescription": "Przygotowywanie danych dla nowego urządzenia",
+    "sessionExpired": "Sesja wygasła",
+    "connecting": "Łączenie...",
+    "verifySecurityCode": "Zweryfikuj kod bezpieczeństwa",
+    "syncingData": "Synchronizowanie danych...",
+    "syncingDataDescription": "To może potrwać kilka sekund"
+  },
+  "displayCode": {
+    "expired": "Wygasł"
+  },
+  "enterCode": {
+    "openingCamera": "Uruchamianie aparatu...",
+    "scanQrCode": "Zeskanuj kod QR",
+    "quickAndEasy": "Szybko i łatwo",
+    "or": "Lub",
+    "codePlaceholder": "ABC 123",
+    "paste": "Wklej",
+    "connecting": "Łączenie...",
+    "connect": "Połącz"
+  },
+  "sas": {
+    "sameCodeQuestion": "Ten sam kod na obu urządzeniach?"
+  },
+  "waiting": {
+    "waitingForConfirmation": "Oczekiwanie na potwierdzenie...",
+    "confirmCodeMatches": "Potwierdź na drugim urządzeniu, że ten kod jest taki sam",
+    "securelyConnecting": "Poczekaj, aż bezpiecznie połączymy Twoje urządzenie"
+  },
+  "result": {
+    "allSet": "Wszystko gotowe!",
+    "connectedSuccessfully": "Urządzenie zostało połączone",
+    "done": "Gotowe",
+    "connectionFailed": "Połączenie nie powiodło się",
+    "tryAgain": "Spróbuj ponownie"
+  },
+  "errors": {
+    "backupPlatformUnsupported": "Kopia zapasowa przed synchronizacją urządzeń jest obecnie obsługiwana tylko w wersji komputerowej, przeglądarkowej i na iOS"
+  }
+}

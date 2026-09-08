@@ -16,7 +16,9 @@ src/i18n/
 ```
 
 Namespaces (one JSON file each): `common`, `dashboard`, `holdings`, `activity`,
-`performance`, `account`, `settings`, `goals`, `income`.
+`performance`, `account`, `settings`, `goals`, `income`, `insights`, `asset`,
+`spending`, `ui`, `ai`, `allocation`, `onboarding`, `auth`, `health`, `sync`,
+`connect`.
 
 ## Using translations in code
 
@@ -42,7 +44,8 @@ browser-detected. It is chosen during onboarding and in Settings → General, an
 persisted through the normal settings pipeline (stored per-device, like `theme`
 and `baseCurrency` — device-sync is not enabled for it). The settings provider
 applies it via `i18n.changeLanguage()` on load and on change. Default is `en`;
-missing keys in fr/de fall back to `en`.
+missing translations fall back to `en`. Adding a language never changes an
+existing language preference, formatting region, timezone, or base currency.
 
 ## Maintenance (i18next-cli)
 
@@ -56,7 +59,9 @@ pnpm --filter frontend i18n:types    # generate typed keys
 ```
 
 `extract` never removes unreferenced keys (`removeUnusedKeys: false`) so
-community-contributed translations are preserved.
+community-contributed translations are preserved. Extraction and status checks
+exclude test fixtures, whose deliberately missing addon keys are not app
+strings.
 
 ## Adding a language
 
@@ -69,6 +74,11 @@ so pick it deliberately before shipping. Five places have to agree:
 4. `SUPPORTED_UI_LANGUAGES` in `crates/core/src/settings/settings_service.rs`,
    plus any alias normalization (`fr-CA` -> `fr`).
 5. `addon-sandbox-i18n.ts`, if the locale should reach addon iframes.
+
+Register the date-fns locale in `packages/ui/src/hooks/use-date-fns-locale.ts`
+for complete calendar and relative-date text. An optional formatting region is a
+separate setting: keep the shared formatting registry, backend region allowlist,
+Settings and onboarding options in sync. Do not infer currency from UI language.
 
 ### Naming
 
@@ -115,6 +125,18 @@ different ways — only a glossary does.
 - **Traditional Chinese (`zh-Hant`)**: contributed in PR #1566, machine-seeded
   from the English source and reviewed for Taiwan financial terminology by a
   native speaker; intended for continued community review.
+- **Polish (`pl`)**: AI-assisted translation of all 20 namespaces, with Polish
+  financial terminology and `_one`, `_few`, `_many`, `_other` forms. For
+  example, 1 uses `_one`, 2 and 22 use `_few`, 0, 5 and 12 use `_many`, and
+  fractional counts use `_other`. `polish.test.ts` covers catalog parity,
+  interpolation, markup, links, plural resolution and key financial
+  distinctions: `wydatki` (spending), `przychody` (income), `oszczędności`
+  (saving), and `przepływy pieniężne netto` (net cash flow). Financial accounts
+  are `rachunki`, holdings `pozycje`, cost basis `koszt nabycia`, and return
+  `stopa zwrotu`. The optional `PL` formatting region controls presentation
+  only; currency codes and saved category names are not translated or migrated.
+  Addons supply their own content translations; their shared `ui` components
+  receive the host's Polish catalog.
 
 Non-English catalogs are machine-drafted and community-corrected. Terminology
 reports are expected and welcome — file them as issues against the locale.

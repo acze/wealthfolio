@@ -1,0 +1,307 @@
+{
+  "issues": {
+    "price_manual_valuation_missing": {
+      "title_one": "Brak ręcznej wyceny dla {{symbol}}",
+      "title_few": "Brak ręcznych wycen dla {{count}} pozycji",
+      "title_many": "Brak ręcznych wycen dla {{count}} pozycji",
+      "title_other": "Brak ręcznych wycen dla {{count}} pozycji",
+      "message": "Pozycje ręczne/niestandardowe wymagają ręcznej wyceny, zanim będzie można uwzględnić je jako wycenione pozycje w analizie wyników."
+    },
+    "price_no_market_data": {
+      "title_one": "Brak danych rynkowych dla {{symbol}}",
+      "title_few": "Brak danych rynkowych dla {{count}} pozycji",
+      "title_many": "Brak danych rynkowych dla {{count}} pozycji",
+      "title_other": "Brak danych rynkowych dla {{count}} pozycji",
+      "message": "Nie można pobrać danych rynkowych dla niektórych pozycji. Przyczyną mogą być nieprawidłowe symbole lub problemy dostawcy. Wartość Twojego portfela może być niedokładna."
+    },
+    "price_stale_outdated": {
+      "title_one": "Nieaktualna cena dla {{count}} pozycji",
+      "title_few": "Nieaktualne ceny dla {{count}} pozycji",
+      "title_many": "Nieaktualne ceny dla {{count}} pozycji",
+      "title_other": "Nieaktualne ceny dla {{count}} pozycji",
+      "message": "Ceny niektórych pozycji nie były aktualizowane od ponad 3 dni. Wartość Twojego portfela może być niedokładna."
+    },
+    "price_update_needed": {
+      "title_one": "Wymagana aktualizacja ceny dla {{count}} pozycji",
+      "title_few": "Wymagane aktualizacje cen dla {{count}} pozycji",
+      "title_many": "Wymagane aktualizacje cen dla {{count}} pozycji",
+      "title_other": "Wymagane aktualizacje cen dla {{count}} pozycji",
+      "message": "Ceny niektórych pozycji nie były ostatnio aktualizowane. Rozważ synchronizację cen."
+    },
+    "fx_missing": {
+      "title_one": "Brak kursu wymiany dla {{currency}}",
+      "title_few": "Brak kursów wymiany dla {{count}} walut",
+      "title_many": "Brak kursów wymiany dla {{count}} walut",
+      "title_other": "Brak kursów wymiany dla {{count}} waluty",
+      "message": "Nie możemy przeliczyć niektórych pozycji na Twoją walutę bazową. Wpływa to na łączną wartość portfela."
+    },
+    "fx_stale_error": {
+      "title_one": "Nieaktualny kurs wymiany",
+      "title_few": "Nieaktualne kursy wymiany dla {{count}} walut",
+      "title_many": "Nieaktualne kursy wymiany dla {{count}} walut",
+      "title_other": "Nieaktualne kursy wymiany dla {{count}} waluty",
+      "message": "Niektóre kursy wymiany nie były aktualizowane od ponad 3 dni. Przeliczenia walut mogą być niedokładne."
+    },
+    "fx_stale_warning": {
+      "title_one": "Wymagana aktualizacja kursu wymiany",
+      "title_few": "Wymagane aktualizacje kursów wymiany dla {{count}} walut",
+      "title_many": "Wymagane aktualizacje kursów wymiany dla {{count}} walut",
+      "title_other": "Wymagane aktualizacje kursów wymiany dla {{count}} waluty",
+      "message": "Niektóre kursy wymiany nie były ostatnio aktualizowane. Rozważ odświeżenie kursów."
+    },
+    "classification_missing_category": {
+      "title_one": "{{count}} pozycja wymaga kategorii",
+      "title_few": "{{count}} pozycje wymagają kategorii",
+      "title_many": "{{count}} pozycji wymaga kategorii",
+      "title_other": "{{count}} pozycji wymaga kategorii",
+      "message": "Niektóre pozycje nie mają przypisanej kategorii w taksonomii {{taxonomy}}. Wpływa to na wykresy alokacji i analizy."
+    },
+    "classification_legacy_migration": {
+      "title_one": "{{count}} aktywo ma dane klasyfikacji w starym formacie",
+      "title_few": "{{count}} aktywa mają dane klasyfikacji w starym formacie",
+      "title_many": "{{count}} aktywów ma dane klasyfikacji w starym formacie",
+      "title_other": "{{count}} aktywa ma dane klasyfikacji w starym formacie",
+      "message": "Niektóre aktywa mają dane sektora/kraju w starym formacie. Przenieś je do nowego systemu taksonomii, aby lepiej śledzić alokację."
+    },
+    "data_orphan_activity_account": {
+      "title_one": "Transakcja odwołuje się do nieistniejącego rachunku",
+      "title_few": "{{count}} transakcje odwołują się do nieistniejących rachunków",
+      "title_many": "{{count}} transakcji odwołuje się do nieistniejących rachunków",
+      "title_other": "{{count}} transakcji odwołuje się do nieistniejących rachunków",
+      "message": "Niektóre transakcje wskazują na rachunki, które już nie istnieją. Może to powodować błędy obliczeń."
+    },
+    "data_orphan_activity_asset": {
+      "title_one": "Transakcja odwołuje się do nieistniejącego aktywa",
+      "title_few": "{{count}} transakcje odwołują się do nieistniejących aktywów",
+      "title_many": "{{count}} transakcji odwołuje się do nieistniejących aktywów",
+      "title_other": "{{count}} transakcji odwołuje się do nieistniejących aktywów",
+      "message": "Niektóre transakcje wskazują na aktywa, które już nie istnieją. Może to powodować błędy obliczeń."
+    },
+    "data_negative_position": {
+      "title_one": "Pozycja ma ujemną ilość",
+      "title_few": "{{count}} pozycje mają ujemne ilości",
+      "title_many": "{{count}} pozycji ma ujemne ilości",
+      "title_other": "{{count}} pozycji ma ujemne ilości",
+      "message": "Niektóre pozycje wykazują ujemne ilości, co zwykle wskazuje na brakujące lub nieprawidłowe transakcje."
+    },
+    "data_legacy_classification": {
+      "title_one": "{{count}} aktywo ma stare dane klasyfikacji",
+      "title_few": "{{count}} aktywa mają stare dane klasyfikacji",
+      "title_many": "{{count}} aktywów ma stare dane klasyfikacji",
+      "title_other": "{{count}} aktywa ma stare dane klasyfikacji",
+      "message": "Niektóre aktywa mają dane sektora/kraju w starym formacie, które można przenieść do nowego systemu klasyfikacji."
+    },
+    "data_negative_account_balance": {
+      "title_one": "Rachunek ma ujemne saldo portfela",
+      "title_few": "{{count}} rachunki mają ujemne saldo portfela",
+      "title_many": "{{count}} rachunków ma ujemne saldo portfela",
+      "title_other": "{{count}} rachunku ma ujemne saldo portfela",
+      "message": "Co najmniej jeden rachunek wykazuje ujemną łączną wartość w swojej historii. Zwykle wynika to z brakujących transakcji kupna. Sprawdź operacje, aby to naprawić."
+    },
+    "data_negative_cash_balance": {
+      "title_one": "Rachunek gotówkowy miał ujemne saldo",
+      "title_few": "{{count}} rachunki gotówkowe miały ujemne saldo",
+      "title_many": "{{count}} rachunków gotówkowych miało ujemne saldo",
+      "title_other": "{{count}} rachunku gotówkowego miało ujemne saldo",
+      "message": "Co najmniej jeden rachunek gotówkowy wykazuje ujemne saldo w swojej historii. Może to być zwykły debet bankowy lub brakujący wpis wpłaty."
+    },
+    "data_missing_lot_disposal_for_sell": {
+      "title_one": "Brak dopasowania kosztu nabycia dla sprzedaży",
+      "title_few": "Brak dopasowania kosztu nabycia dla {{count}} transakcji sprzedaży",
+      "title_many": "Brak dopasowania kosztu nabycia dla {{count}} transakcji sprzedaży",
+      "title_other": "Brak dopasowania kosztu nabycia dla {{count}} transakcji sprzedaży",
+      "message": "Nie udało się dopasować sprzedaży do partii nabycia, więc zrealizowany zysk/strata i przypisanie składników wyniku mogą być niekompletne."
+    },
+    "data_missing_generated_valuation": {
+      "title_one": "Historia wygenerowanych wycen jest niekompletna",
+      "title_few": "Brakuje {{count}} wygenerowanych wierszy wyceny",
+      "title_many": "Brakuje {{count}} wygenerowanych wierszy wyceny",
+      "title_other": "Brakuje {{count}} wygenerowanego wiersza wyceny",
+      "message": "Dla niektórych dat migawek pozycji nie wygenerowano wierszy wyceny. Odbuduj historię rachunku po uzupełnieniu brakujących cen, ręcznych wycen lub kursów walut."
+    },
+    "data_incomplete_valuation_value": {
+      "title_one": "Wycena nie obejmuje wszystkich danych",
+      "title_few": "{{count}} wiersze wyceny mają niepełną wartość rynkową",
+      "title_many": "{{count}} wierszy wyceny ma niepełną wartość rynkową",
+      "title_other": "{{count}} wiersza wyceny ma niepełną wartość rynkową",
+      "message": "Niektóre wygenerowane wiersze wyceny nie obejmują pełnej wartości rynkowej. Aby zachować poprawność, analiza wyników oznacza odpowiednie stopy zwrotu jako niedostępne lub o obniżonej wiarygodności. Sprawdź brakujące ceny lub ręczne wyceny."
+    },
+    "data_incomplete_valuation_basis": {
+      "title_one": "Dane kosztu nabycia są niekompletne",
+      "title_few": "{{count}} pozycje mają niekompletne dane kosztu nabycia",
+      "title_many": "{{count}} pozycji ma niekompletne dane kosztu nabycia",
+      "title_other": "{{count}} pozycji ma niekompletne dane kosztu nabycia",
+      "message": "Niektóre pozycje mają brakujący lub częściowy koszt nabycia. Wartość rynkowa może nadal być wyświetlana, ale zysk/strata i stopy zwrotu względem kosztu nabycia mogą być niedostępne do czasu poprawienia powiązanych operacji."
+    },
+    "data_unknown_performance_flow_source": {
+      "title_one": "Nie wiadomo, czy przepływ przekracza granicę portfela",
+      "title_few": "{{count}} wiersze wyceny mają nieznaną klasyfikację transferu",
+      "title_many": "{{count}} wierszy wyceny ma nieznaną klasyfikację transferu",
+      "title_other": "{{count}} wiersza wyceny ma nieznaną klasyfikację transferu",
+      "message": "Niektóre wygenerowane wiersze wyceny zawierają transfer lub przepływ, dla którego nie wiadomo, czy przekracza granicę portfela. Sprawdź operacje transferu w odpowiednich dniach i oznacz każdy transfer jako zewnętrzny lub powiąż go z odpowiadającym mu rachunkiem."
+    },
+    "account_unconfigured": {
+      "title_one": "{{count}} rachunek wymaga konfiguracji",
+      "title_few": "{{count}} rachunki wymagają konfiguracji",
+      "title_many": "{{count}} rachunków wymaga konfiguracji",
+      "title_other": "{{count}} rachunku wymaga konfiguracji",
+      "message_one": "Wybierz tryb śledzenia, aby rozpocząć synchronizację danych.",
+      "message_few": "Wybierz tryby śledzenia, aby rozpocząć synchronizację danych.",
+      "message_many": "Wybierz tryby śledzenia, aby rozpocząć synchronizację danych.",
+      "message_other": "Wybierz tryby śledzenia, aby rozpocząć synchronizację danych."
+    },
+    "account_timezone_missing": {
+      "title": "Strefa czasowa nie jest skonfigurowana",
+      "message": "Ustaw strefę czasową w ustawieniach ogólnych, aby daty odpowiadały Twojemu regionowi."
+    },
+    "account_timezone_invalid": {
+      "title": "Skonfigurowana strefa czasowa jest nieprawidłowa",
+      "message": "Skonfigurowana strefa czasowa \"{{timezone}}\" jest nieprawidłowa. Zaktualizuj ją w ustawieniach ogólnych."
+    },
+    "account_timezone_mismatch": {
+      "title": "Strefy czasowe przeglądarki i aplikacji różnią się",
+      "message": "Skonfigurowana strefa czasowa to \"{{configured}}\", a strefa czasowa przeglądarki to \"{{browser}}\". Daty są zgodne ze skonfigurowaną strefą czasową."
+    },
+    "quote_sync_error": {
+      "title_one": "Synchronizacja notowań dla {{symbol}} nie powodzi się",
+      "title_few": "Synchronizacja notowań dla {{count}} aktywów nie powodzi się",
+      "title_many": "Synchronizacja notowań dla {{count}} aktywów nie powodzi się",
+      "title_other": "Synchronizacja notowań dla {{count}} aktywa nie powodzi się",
+      "message": "Wielokrotnie nie udało się zsynchronizować cen tych aktywów. Sprawdź symbole lub ustawienia dostawcy danych."
+    },
+    "quote_sync_warning": {
+      "title_one": "Problemy z synchronizacją dla {{symbol}}",
+      "title_few": "Problemy z synchronizacją dla {{count}} aktywów",
+      "title_many": "Problemy z synchronizacją dla {{count}} aktywów",
+      "title_other": "Problemy z synchronizacją dla {{count}} aktywa",
+      "message": "Niektóre aktywa mają problemy z synchronizacją cen. Mogą one ustąpić automatycznie."
+    },
+    "transfer_incomplete": {
+      "title_one": "Wykryto niekompletny transfer",
+      "title_few": "Wykryto {{count}} niekompletne transfery",
+      "title_many": "Wykryto {{count}} niekompletnych transferów",
+      "title_other": "Wykryto {{count}} niekompletnego transferu",
+      "message": "Transfer nie jest sparowany lub brakuje odpowiadającej mu drugiej strony, więc jego przepływ potraktowano jako zewnętrzny, co może zniekształcać stopy zwrotu. Sparuj go z odpowiadającym transferem lub oznacz jako zewnętrzny, jeśli taki był zamiar."
+    }
+  },
+  "page": {
+    "heading": "Jakość danych",
+    "text": "Identyfikuj i rozwiązuj problemy z jakością danych"
+  },
+  "severity": {
+    "info": "Informacja",
+    "warning": "Ostrzeżenie",
+    "error": "Błąd",
+    "critical": "Krytyczny"
+  },
+  "category": {
+    "prices": "Ceny",
+    "fxRates": "Kursy walut",
+    "categories": "Kategorie",
+    "data": "Dane",
+    "accounts": "Rachunki",
+    "settings": "Ustawienia"
+  },
+  "actions": {
+    "fix": "Napraw",
+    "clear": "Wyczyść",
+    "sync_prices": "Synchronizuj ceny",
+    "fetch_fx": "Pobierz kursy wymiany",
+    "migrate_classifications": "Przenieś klasyfikacje",
+    "migrate_legacy_classifications": "Rozpocznij migrację",
+    "retry_sync": "Ponów synchronizację",
+    "to_holdings": "Pokaż pozycje",
+    "to_activities": "Pokaż operacje",
+    "to_accounts": "Pokaż rachunki",
+    "to_taxonomies": "Pokaż klasyfikacje",
+    "to_market_data": "Pokaż dane rynkowe",
+    "to_general_settings": "Otwórz ustawienia ogólne",
+    "to_connect": "Skonfiguruj rachunki",
+    "review_transfers": "Sprawdź transfery"
+  },
+  "updatedAt": "Zaktualizowano {{time}}",
+  "healthy": {
+    "title": "Twoje dane są w świetnym stanie",
+    "description": "Nie znaleziono problemów. Dane Twojego portfela są spójne i aktualne."
+  },
+  "loadError": {
+    "title": "Nie udało się wczytać stanu jakości danych",
+    "retry": "Ponów"
+  },
+  "sheet": {
+    "groupedPriceMessage": "Wealthfolio używa dla tych dat cen przeniesionych z wcześniejszych dni. Pobierz ponownie lub dodaj ceny dla faktycznych dni sesyjnych. Odrzuć problem, jeśli daty przypadały na święta lub dni bez sesji.",
+    "pricesByInvestment": "Ceny według inwestycji",
+    "pricesByInvestmentHint": "Otwórz inwestycję, aby ponownie pobrać lub dodać ceny. Jeśli daty przypadały na święta lub dni bez sesji, odrzuć problem.",
+    "priceHistoryNeedsReview": "Historia cen wymaga sprawdzenia",
+    "missingTradingDay_one": "1 brakujący dzień sesyjny: {{dates}}",
+    "missingTradingDay_few": "{{count}} brakujące dni sesyjne: {{dates}}",
+    "missingTradingDay_many": "{{count}} brakujących dni sesyjnych: {{dates}}",
+    "missingTradingDay_other": "{{count}} brakującego dnia sesyjnego: {{dates}}",
+    "dateRange": "od {{from}} do {{to}}",
+    "priceIssueSummary": "Problemy z cenami: {{diagnosticCount}} {{dateWord}} · {{assetCount}} {{assetWord}}",
+    "priceDate_one": "data",
+    "priceDate_few": "daty",
+    "priceDate_many": "dat",
+    "priceDate_other": "daty",
+    "investment_one": "inwestycja",
+    "investment_few": "inwestycje",
+    "investment_many": "inwestycji",
+    "investment_other": "inwestycji"
+  },
+  "detail": {
+    "categories": {
+      "priceStaleness": {
+        "label": "Nieaktualne ceny",
+        "description": "Ceny rynkowe są nieaktualne i wymagają odświeżenia. Może to wpływać na dokładność wyceny portfela."
+      },
+      "fxIntegrity": {
+        "label": "Kursy wymiany",
+        "description": "Brakujące lub nieaktualne kursy wymiany do przeliczania walut. Może to wpływać na obliczenia w portfelu wielowalutowym."
+      },
+      "classification": {
+        "label": "Klasyfikacja",
+        "description": "Aktywom brakuje kategorii lub klasyfikacji. Wpływa to na zestawienia portfela i analizę alokacji."
+      },
+      "dataConsistency": {
+        "label": "Spójność danych",
+        "description": "Wykryto niespójności w danych portfela. Mogą one powodować niedokładności w raportach lub obliczeniach."
+      },
+      "accountConfiguration": {
+        "label": "Konfiguracja rachunków",
+        "description": "Niektóre rachunki wymagają konfiguracji przed synchronizacją danych. Ustaw tryb śledzenia, aby rozpocząć import danych."
+      },
+      "settingsConfiguration": {
+        "label": "Ustawienia",
+        "description": "Niektóre ustawienia aplikacji wymagają uwagi, aby dane były poprawnie interpretowane."
+      },
+      "timezoneMissing": {
+        "label": "Ustawienia strefy czasowej",
+        "description": "Strefa czasowa aplikacji nie jest skonfigurowana. Dopóki jej nie ustawisz, wyświetlane daty mogą nie odpowiadać Twojemu regionowi."
+      },
+      "timezoneInvalid": {
+        "label": "Ustawienia strefy czasowej",
+        "description": "Skonfigurowana strefa czasowa jest nieprawidłowa. Zaktualizuj ją w ustawieniach ogólnych, aby przywrócić spójną obsługę dat."
+      },
+      "timezoneMismatch": {
+        "label": "Ustawienia strefy czasowej",
+        "description": "Strefa czasowa przeglądarki różni się od skonfigurowanej strefy czasowej aplikacji. Daty portfela są zgodne ze skonfigurowaną strefą czasową."
+      }
+    },
+    "affectedItems": "Elementy objęte problemem ({{count}})",
+    "impact": "Wpływ",
+    "affectedItemsCount": "Elementy objęte problemem",
+    "portfolioImpact": "Wpływ na portfel",
+    "details": "Szczegóły",
+    "aboutThisIssue": "O tym problemie",
+    "dismiss": "Odrzuć",
+    "dismissConfirm": {
+      "title": "Odrzucić ten problem?",
+      "message": "Problem zostanie ukryty w centrum jakości danych. Pojawi się ponownie, jeśli zmienią się dane, które go spowodowały.",
+      "pendingText": "Odrzucanie..."
+    },
+    "affectedItems_one": "Element objęty problemem ({{count}})",
+    "affectedItems_few": "Elementy objęte problemem ({{count}})",
+    "affectedItems_many": "Elementy objęte problemem ({{count}})",
+    "affectedItems_other": "Elementy objęte problemem ({{count}})"
+  }
+}

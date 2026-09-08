@@ -160,13 +160,13 @@ function ActivitiesHelpContent() {
               <li>INTEREST</li>
               <li>DEPOSIT</li>
               <li>WITHDRAWAL</li>
-              <li>TRANSFER_IN (Moves cash/assets in)</li>
-              <li>TRANSFER_OUT (Moves cash/assets out)</li>
+              <li>TRANSFER_IN ({t("activity:import.help.transferInDescription")})</li>
+              <li>TRANSFER_OUT ({t("activity:import.help.transferOutDescription")})</li>
               <li>FEE</li>
               <li>TAX</li>
-              <li>SPLIT (Use Amount as the split ratio, e.g. 2 for 2:1)</li>
-              <li>CREDIT (Cash credits: refunds, rebates, bonuses)</li>
-              <li>ADJUSTMENT (Non-trade corrections)</li>
+              <li>SPLIT ({t("activity:import.help.splitDescription")})</li>
+              <li>CREDIT ({t("activity:import.help.creditDescription")})</li>
+              <li>ADJUSTMENT ({t("activity:import.help.adjustmentDescription")})</li>
             </ul>
           </pre>
         </div>

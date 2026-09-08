@@ -1,7 +1,7 @@
-import { forwardRef, useCallback, useRef, useState } from "react";
+import { forwardRef, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
-import { worldCurrencies } from "../../lib/currencies";
+import { getLocalizedCurrencyOptions, worldCurrencies } from "../../lib/currencies";
 import { cn } from "../../lib/utils";
 import type { ButtonProps } from "../ui/button";
 import { Button } from "../ui/button";
@@ -40,7 +40,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
       value,
       onChange,
       className,
-      placeholder = "Select account currency",
+      placeholder,
       displayMode = "auto",
       valueDisplay = "label",
       autoFocusSearch = false,
@@ -52,7 +52,10 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
     },
     ref,
   ) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const uiLanguage = i18n.resolvedLanguage || i18n.language;
+    const currencies = useMemo(() => getLocalizedCurrencyOptions(worldCurrencies, uiLanguage), [uiLanguage]);
+    const resolvedPlaceholder = placeholder ?? t("ui:currency.placeholder", "Select account currency");
     const isControlled = openProp !== undefined;
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
     const open = isControlled ? openProp : uncontrolledOpen;
@@ -72,14 +75,14 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
     const isMobileFromHook = useIsMobileHook();
     const isMobile = displayMode === "mobile" || (displayMode === "auto" && isMobileFromHook);
 
-    const selectedCurrency = worldCurrencies.find((currency) => currency.value === value);
+    const selectedCurrency = currencies.find((currency) => currency.value === value);
     const buttonLabel = selectedCurrency
       ? valueDisplay === "code"
         ? selectedCurrency.value
         : valueDisplay === "code-label"
           ? `${selectedCurrency.value} - ${selectedCurrency.label}`
           : selectedCurrency.label
-      : value || placeholder;
+      : value || resolvedPlaceholder;
 
     const handleSelect = (currencyValue: string) => {
       onChange(currencyValue);
@@ -109,7 +112,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
     );
 
     if (isMobile) {
-      const filteredCurrencies = worldCurrencies.filter(
+      const filteredCurrencies = currencies.filter(
         (curr) =>
           curr.value.toLowerCase().includes(searchQuery.toLowerCase()) ||
           curr.label.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -121,7 +124,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
           : valueDisplay === "label"
             ? selectedCurrency.label
             : `${selectedCurrency.value} - ${selectedCurrency.label}`
-        : value || placeholder;
+        : value || resolvedPlaceholder;
 
       return (
         <>
@@ -157,7 +160,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
 
               <div className="flex h-[calc(85vh-7rem)] flex-col">
                 <div className="border-border border-b px-6 py-4">
-                  <h3 className="text-foreground mb-3 text-sm font-semibold">Popular</h3>
+                  <h3 className="text-foreground mb-3 text-sm font-semibold">{t("ui:currency.popular", "Popular")}</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {popularCurrencies.map((curr) => (
                       <button
@@ -325,7 +328,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                       })}
                     </CommandItem>
                   )}
-                  {worldCurrencies.map((currency) => (
+                  {currencies.map((currency) => (
                     <CommandItem
                       value={currency.label}
                       key={currency.value}
