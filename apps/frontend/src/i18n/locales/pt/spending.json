@@ -124,6 +124,8 @@
     "amountChipBetween": "Valor entre {{value}} e {{value2}}"
   },
   "transactions": {
+    "categorizeLimit": "É possível categorizar até {{limit}} transações por vez. Reduza a seleção para continuar.",
+    "deleteSelectionUnavailable": "A seleção foi alterada ou ainda está sendo carregada. Feche esta janela e confira a seleção antes de excluir.",
     "deleteTitle_one": "Excluir transação",
     "deleteTitle_other": "Excluir transações",
     "deleteTitle_many": "Excluir transações",

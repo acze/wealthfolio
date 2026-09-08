@@ -103,11 +103,15 @@ const getStatusText = (percentUsed: number, varianceTolerance: number, t: TFunct
   const underBudgetThreshold = 100 - varianceTolerance;
   const onTrackUpperBound = 100 + varianceTolerance;
   if (percentUsed >= 120)
-    return t("ui:budget.overBudget", "{{percent}}% over budget", { percent: Math.round(percentUsed - 100) });
+    return t("ui:budget.overBudget", `${Math.round(percentUsed - 100)}% over budget`, {
+      percent: Math.round(percentUsed - 100),
+    });
   if (percentUsed > onTrackUpperBound)
-    return t("ui:budget.overBudget", "{{percent}}% over budget", { percent: Math.round(percentUsed - 100) });
+    return t("ui:budget.overBudget", `${Math.round(percentUsed - 100)}% over budget`, {
+      percent: Math.round(percentUsed - 100),
+    });
   if (percentUsed >= underBudgetThreshold) return t("ui:budget.onTrack", "On track");
-  return t("ui:budget.used", "{{percent}}% used", { percent: Math.round(percentUsed) });
+  return t("ui:budget.used", `${Math.round(percentUsed)}% used`, { percent: Math.round(percentUsed) });
 };
 
 export const BudgetGaugeCard: React.FC<BudgetGaugeCardProps> = ({

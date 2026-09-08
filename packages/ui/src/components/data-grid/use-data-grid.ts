@@ -1241,7 +1241,7 @@ function useDataGrid<TData>({
           restoreFocus(dataGridRef.current);
         } else if (cellsSkipped > 0) {
           toast.error(
-            t("ui:dataGrid.pasteSkipped", "Cells skipped due to invalid data: {{count}}", {
+            t("ui:dataGrid.pasteSkipped", `Cells skipped due to invalid data: ${cellsSkipped}`, {
               count: cellsSkipped,
             }),
           );

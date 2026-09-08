@@ -1077,4 +1077,136 @@ test.describe("Spending selection analysis with real paginated transactions", ()
         .getByRole("checkbox"),
     ).toBeChecked();
   });
+
+  test("saves Polish through settings, survives reload and keeps Analysis and long net labels usable at 390px", async ({}, testInfo) => {
+    const before = await api<{ baseCurrency: string; language: string; formattingRegion: string }>(
+      "/settings",
+      undefined,
+      "GET",
+    );
+    const reference = await search({ includeSelectionSnapshot: true });
+    const finishWriteObservation = observeLedgerWrites();
+    await gotoAppPath(page, "/settings/general");
+    const languageSelect = page.locator('[data-testid="language-select"]:visible');
+    await languageSelect.click();
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/settings") && response.request().method() === "PUT",
+    );
+    await page.getByTestId("language-option-pl").click();
+    const savedResponse = await saved;
+    expect(savedResponse.ok()).toBe(true);
+    expect(savedResponse.request().postDataJSON().language).toBe("pl");
+    await expect(languageSelect).toHaveText("Polski");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(languageSelect).toHaveText("Polski");
+    await expect(page.locator("html")).toHaveAttribute("lang", "pl");
+    await expect(
+      page.getByText("Język i region", { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
+    const persisted = await api<{
+      baseCurrency: string;
+      language: string;
+      formattingRegion: string;
+    }>("/settings", undefined, "GET");
+    expect(persisted.language).toBe("pl");
+    expect(persisted.baseCurrency).toBe(before.baseCurrency);
+    expect(persisted.formattingRegion).toBe(before.formattingRegion);
+    await page.screenshot({
+      path: testInfo.outputPath("polish-settings-saved.png"),
+      fullPage: true,
+    });
+
+    const polishAnalysis = () =>
+      page.getByRole("region", { name: "Analiza zaznaczenia", exact: true });
+    const polishBulk = () => page.getByRole("region", { name: "Działania zbiorcze", exact: true });
+    const expectedCount = reference.totalCount;
+    await gotoAppPath(page, activitiesPath({ analysis: "false" }));
+    await page
+      .getByRole("checkbox", { name: "Zaznacz wszystkie widoczne transakcje", exact: true })
+      .click();
+    await expect(polishBulk()).toContainText("Zaznaczono 50");
+    await page.getByRole("button", { name: "Analizuj zaznaczenie", exact: true }).click();
+    await expect(polishAnalysis()).toContainText(
+      `Zaznaczono 50 z ${expectedCount} pasujących transakcji`,
+    );
+    await polishAnalysis()
+      .getByRole("button", { name: "Zaznacz wszystkie pasujące", exact: true })
+      .click();
+    await expect(polishAnalysis()).toContainText(
+      `Zaznaczono ${expectedCount} z ${expectedCount} pasujących transakcji`,
+    );
+    await expect(page.getByTestId("analysis-selected")).toContainText("Wydatki netto");
+    await expect(page.getByTestId("analysis-selected")).toContainText(before.baseCurrency);
+    await polishAnalysis().getByRole("button", { name: "Zakończ analizę", exact: true }).click();
+    await expect(polishBulk()).toContainText(`Zaznaczono ${expectedCount}`);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoAppPath(page, activitiesPath());
+    await expect(polishAnalysis()).toContainText(
+      `Zaznaczono 0 z ${expectedCount} pasujących transakcji`,
+    );
+    await polishAnalysis()
+      .getByRole("button", { name: "Zaznacz wszystkie pasujące", exact: true })
+      .click();
+    await expect(polishAnalysis()).toContainText(
+      `Zaznaczono ${expectedCount} z ${expectedCount} pasujących transakcji`,
+    );
+    await polishAnalysis().getByRole("button", { name: "Zakończ analizę", exact: true }).click();
+    await expect(polishBulk()).toContainText(`Zaznaczono ${expectedCount}`);
+    const netLabels = [
+      "Przepływy pieniężne netto zaznaczonych",
+      "Przepływy pieniężne netto po filtrowaniu",
+    ];
+    const layout = await page.evaluate((labels) => {
+      const readouts = labels.map((label) => {
+        const element = [...document.querySelectorAll("span")].find(
+          (el) => el.firstChild?.nodeType === Node.TEXT_NODE && el.firstChild.textContent === label,
+        );
+        if (!element) throw new Error(`Missing translated net label: ${label}`);
+        const labelRange = document.createRange();
+        labelRange.selectNode(element.firstChild!);
+        const labelBox = labelRange.getBoundingClientRect();
+        return {
+          label,
+          labelLeft: labelBox.left,
+          labelRight: labelBox.right,
+          clipped: element.scrollWidth > element.clientWidth,
+          pills: [...element.querySelectorAll(".rounded-full")].map((pill) => {
+            const box = pill.getBoundingClientRect();
+            return { text: pill.textContent, left: box.left, right: box.right };
+          }),
+        };
+      });
+      return { width: innerWidth, documentWidth: document.documentElement.scrollWidth, readouts };
+    }, netLabels);
+    expect(layout.width).toBe(390);
+    expect(layout.documentWidth).toBeLessThanOrEqual(390);
+    for (const readout of layout.readouts) {
+      expect(readout.clipped).toBe(false);
+      expect(readout.labelLeft).toBeGreaterThanOrEqual(0);
+      expect(readout.labelRight).toBeLessThanOrEqual(390);
+      for (const pill of readout.pills) {
+        expect(pill.left).toBeGreaterThanOrEqual(0);
+        expect(pill.right).toBeLessThanOrEqual(390);
+      }
+    }
+    expect(layout.readouts[0].pills.some((pill) => pill.text?.includes("EUR"))).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("polish-mobile-selection.png"),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Analizuj zaznaczenie", exact: true }).click();
+    await expect(polishAnalysis()).toContainText(
+      `Zaznaczono ${expectedCount} z ${expectedCount} pasujących transakcji`,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("polish-mobile-analysis.png"),
+      fullPage: true,
+    });
+    expect((await search({ includeSelectionSnapshot: true })).analysis.matching).toEqual(
+      reference.analysis.matching,
+    );
+    expect(finishWriteObservation()).toEqual([]);
+  });
 });

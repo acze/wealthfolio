@@ -146,7 +146,7 @@ export function SwipableView({
                   aria-live="polite"
                 >
                   {items[selectedIndex]?.name ||
-                    t("ui:carousel.view", "View {{number}}", { number: selectedIndex + 1 })}
+                    t("ui:carousel.view", `View ${selectedIndex + 1}`, { number: selectedIndex + 1 })}
                 </div>
               ) : (
                 /* Dot Navigation */
@@ -161,8 +161,8 @@ export function SwipableView({
                   )}
                   aria-label={
                     items[index]?.name
-                      ? t("ui:carousel.goTo", "Go to {{name}}", { name: items[index].name })
-                      : t("ui:carousel.goToView", "Go to view {{number}}", { number: index + 1 })
+                      ? t("ui:carousel.goTo", `Go to ${items[index].name}`, { name: items[index].name })
+                      : t("ui:carousel.goToView", `Go to view ${index + 1}`, { number: index + 1 })
                   }
                 />
               )}
