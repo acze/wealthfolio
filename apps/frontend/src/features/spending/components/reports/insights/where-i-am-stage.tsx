@@ -718,14 +718,14 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
   const netToneClass = totals.net >= 0 ? "text-success" : "text-destructive";
 
   return (
-    <div className={CARD_CLASS}>
+    <div className={`${CARD_CLASS} @container min-w-0`} data-testid="net-cashflow-card">
       <div className="flex items-baseline justify-between">
         <div className={LABEL_CLASS}>{t("spending:whereIAm.netCashflow")}</div>
       </div>
-      <div className="mt-2 flex items-baseline justify-between gap-2">
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
         <div
           className={cn(
-            "text-lg font-semibold tabular-nums tracking-tight md:text-xl",
+            "min-w-0 max-w-full text-lg font-semibold tabular-nums tracking-tight [overflow-wrap:anywhere] md:text-xl",
             netToneClass,
           )}
         >
@@ -735,7 +735,7 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
         {totals.income > 0 && (
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
+              "max-w-full rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
               totals.net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
             )}
           >
@@ -761,52 +761,70 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
         )}
       </div>
 
-      <div className="mt-4 space-y-2">
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="text-muted-foreground w-12 shrink-0">
+      <div className="@min-[26rem]:grid-cols-[max-content_minmax(1rem,1fr)_minmax(0,max-content)] mt-4 grid grid-cols-[minmax(min-content,1fr)_minmax(0,max-content)] gap-x-2 gap-y-2">
+        <div
+          className="col-span-full grid grid-cols-subgrid items-center gap-y-1.5 text-[11px]"
+          data-testid="net-cashflow-row"
+        >
+          <span className="text-muted-foreground col-start-1 row-start-1">
             {t("spending:cashFlow.income")}
           </span>
-          <div className="bg-foreground/5 h-1.5 flex-1 overflow-hidden rounded-full">
+          <div
+            className="bg-foreground/5 @min-[26rem]:col-span-1 @min-[26rem]:col-start-2 @min-[26rem]:row-start-1 col-span-full col-start-1 row-start-2 h-1.5 overflow-hidden rounded-full"
+            data-testid="net-cashflow-track"
+          >
             <div
               className="bg-success/65 h-full rounded-full transition-all"
               style={{ width: `${incomePct}%` }}
             />
           </div>
-          <span className="text-foreground/90 w-20 shrink-0 text-right font-semibold tabular-nums">
+          <span className="text-foreground/90 @min-[26rem]:col-start-3 col-start-2 row-start-1 min-w-0 text-right font-semibold tabular-nums [overflow-wrap:anywhere]">
             <PrivacyAmount value={totals.income} currency={currency} />
           </span>
         </div>
         {totals.income === 0 && (
-          <p className="text-muted-foreground/70 pl-14 text-[10px] leading-snug">
+          <p className="text-muted-foreground/70 col-span-full text-[10px] leading-snug">
             {t("spending:whereIAm.noIncome")}
           </p>
         )}
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="text-muted-foreground w-12 shrink-0">
+        <div
+          className="col-span-full grid grid-cols-subgrid items-center gap-y-1.5 text-[11px]"
+          data-testid="net-cashflow-row"
+        >
+          <span className="text-muted-foreground col-start-1 row-start-1">
             {t("spending:whereIAm.spent")}
           </span>
-          <div className="bg-foreground/5 h-1.5 flex-1 overflow-hidden rounded-full">
+          <div
+            className="bg-foreground/5 @min-[26rem]:col-span-1 @min-[26rem]:col-start-2 @min-[26rem]:row-start-1 col-span-full col-start-1 row-start-2 h-1.5 overflow-hidden rounded-full"
+            data-testid="net-cashflow-track"
+          >
             <div
               className="bg-foreground/60 h-full rounded-full transition-all"
               style={{ width: `${spentPct}%` }}
             />
           </div>
-          <span className="text-foreground/90 w-20 shrink-0 text-right font-semibold tabular-nums">
+          <span className="text-foreground/90 @min-[26rem]:col-start-3 col-start-2 row-start-1 min-w-0 text-right font-semibold tabular-nums [overflow-wrap:anywhere]">
             <PrivacyAmount value={totals.spent} currency={currency} />
           </span>
         </div>
         {totals.saved > 0 && (
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="text-muted-foreground w-12 shrink-0">
+          <div
+            className="col-span-full grid grid-cols-subgrid items-center gap-y-1.5 text-[11px]"
+            data-testid="net-cashflow-row"
+          >
+            <span className="text-muted-foreground col-start-1 row-start-1">
               {t("spending:whereIAm.saved")}
             </span>
-            <div className="bg-foreground/5 h-1.5 flex-1 overflow-hidden rounded-full">
+            <div
+              className="bg-foreground/5 @min-[26rem]:col-span-1 @min-[26rem]:col-start-2 @min-[26rem]:row-start-1 col-span-full col-start-1 row-start-2 h-1.5 overflow-hidden rounded-full"
+              data-testid="net-cashflow-track"
+            >
               <div
                 className="h-full rounded-full bg-[#6B8E54]/70 transition-all"
                 style={{ width: `${savedPct}%` }}
               />
             </div>
-            <span className="text-foreground/90 w-20 shrink-0 text-right font-semibold tabular-nums">
+            <span className="text-foreground/90 @min-[26rem]:col-start-3 col-start-2 row-start-1 min-w-0 text-right font-semibold tabular-nums [overflow-wrap:anywhere]">
               <PrivacyAmount value={totals.saved} currency={currency} />
             </span>
           </div>
